@@ -2,155 +2,206 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plant & Soil Expert System V23.0</title>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
         :root { --neon: #39FF14; --bg: #0a0a0a; --panel: #151515; --text: #eee; --glow: 0 0 20px rgba(57, 255, 20, 0.6); }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
-        .main-container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        .upload-zone { background: #1a1a1a; border: 2px dashed var(--neon); padding: 15px; text-align: center; border-radius: 15px; }
-        .control-panel { background: var(--panel); padding: 20px; border-radius: 15px; border: 3px solid var(--neon); box-shadow: var(--glow); display: flex; flex-direction: column; gap: 15px; }
-        .search-grid { display: flex; gap: 40px; align-items: flex-start; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; }
+        .main-container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        .upload-zone { background: #1a1a1a; border: 2px dashed var(--neon); padding: 12px; text-align: center; border-radius: 12px; }
         
-        .global-box { flex: 2; position: relative; }
-        .global-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; width: 100%; }
-        .header-left { display: flex; align-items: center; gap: 30px; flex-grow: 1; }
+        .control-panel { background: var(--panel); padding: 15px; border-radius: 12px; border: 3px solid var(--neon); box-shadow: var(--glow); display: flex; flex-direction: column; gap: 12px; }
         
-        .checkbox-container { display: flex; gap: 20px; font-size: 0.85rem; color: #aaa; margin-left: 20px; }
-        .checkbox-container label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        .checkbox-container input[type="checkbox"] { cursor: pointer; accent-color: var(--neon); width: auto; padding: 0; }
+        /* Sistema de Grilla Horizontal Ultra-Compacto */
+        .search-grid { display: flex; flex-direction: column; gap: 10px; }
+        
+        /* FILA SUPERIOR: Botón raíz, categoría pequeña y botón columnas + */
+        .top-action-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        
+        /* Combobox Categoría Pequeño y estilizado */
+        .category-mini-select { max-width: 180px; padding: 6px 10px; font-size: 0.85rem; border: 1px solid var(--neon); background: #000; color: #fff; }
+        .btn-col-help { background: #222; color: var(--neon); border: 1px solid var(--neon); padding: 6px 12px; cursor: pointer; font-weight: bold; border-radius: 5px; font-size: 0.8rem; }
 
-        .right-box-wrapper { width: 300px; display: flex; flex-direction: column; gap: 15px; }
-        .input-group { display: flex; gap: 8px; }
-        input, select { background: #000; border: 1px solid #444; color: white; padding: 12px; border-radius: 5px; outline: none; }
-        input:focus, select:focus { border-color: var(--neon); }
-        .attr-input { flex-grow: 1; border: 1px solid var(--neon); font-size: 1rem; }
-        .btn-col-help { background: #222; color: var(--neon); border: 1px solid var(--neon); padding: 0 15px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        /* FILA PRINCIPAL DE BUSCADORES: Alineación a la derecha */
+        .search-inputs-row { display: flex; align-items: center; justify-content: flex-end; gap: 30px; width: 100%; flex-wrap: wrap; }
         
-        .btn-new-search { background: #ff4444; color: white; border: none; padding: 8px 15px; cursor: pointer; font-weight: bold; border-radius: 5px; text-transform: uppercase; font-size: 0.8rem; margin-top: 8px; display: inline-block; max-width: max-content; }
+        /* Bloque Atributos */
+        .attr-search-block { flex-grow: 1; min-width: 200px; position: relative; }
+        .attr-input { width: 100%; box-sizing: border-box; border: 1px solid var(--neon); font-size: 0.95rem; padding: 10px; }
+        
+        /* Bloque Suelo (Reducido a 20% y empujado a la derecha) */
+        .soil-search-block { width: 20%; min-width: 180px; position: relative; }
+        .soil-input { width: 100%; box-sizing: border-box; border: 1px solid gold; font-size: 0.95rem; padding: 10px; }
+        
+        /* Buscador de Nombre de Planta (Reducido a 20% y empujado a la derecha) */
+        .plant-name-block { width: 20%; min-width: 180px; position: relative; }
+        .plant-input { width: 100%; box-sizing: border-box; border: 1px solid var(--neon); font-size: 0.95rem; padding: 10px; }
+
+        /* FILA SUB-CONTROLES: Todo fluye continuamente de izquierda a derecha */
+        .sub-controls-row { display: flex; width: 100%; background: #0c0c0c; padding: 8px; border-radius: 6px; box-sizing: border-box; }
+        
+        /* Contenedor unificado para filtros fijos y dinámicos alineados */
+        .all-filters-wrapper { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; align-items: center; }
+        
+        /* Contenedores individuales corregidos (Fijos) */
+        .filter-item-box { display: flex; flex-direction: column; gap: 2px; width: 110px; flex-shrink: 0; }
+        .filter-item-box.height-box { width: 130px; }
+        
+        .filter-item-box label { font-size: 0.55rem; color: #888; text-transform: uppercase; }
+        .filter-item-box input, .filter-item-box select { padding: 4px; font-size: 0.75rem; background: #000; border: 1px solid #444; color: #fff; width: 100%; box-sizing: border-box; }
+        
+        /* AREA DINÁMICA: Empieza justo después de Foliage sin estirarse */
+        .dynamic-filters-area { display: flex; flex-wrap: wrap; gap: 12px; }
+
+        /* Tags dinámicos con comportamiento idéntico a los fijos */
+        .filter-tag { display: flex; flex-direction: column; gap: 2px; width: 120px; flex-shrink: 0; }
+        .filter-tag .tag-label-container { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .filter-tag span { font-size: 0.55rem; color: var(--neon); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95px; }
+        .filter-tag .remove { color: #ff4444; cursor: pointer; font-weight: bold; font-size: 0.75rem; line-height: 1; }
+        .filter-tag select { padding: 4px; font-size: 0.75rem; border: 1px solid var(--neon); background: #000; color: white; width: 100%; box-sizing: border-box; border-radius: 5px; }
+
+        /* Checkboxes y contador al final */
+        .footer-panel-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; border-top: 1px solid #222; padding-top: 8px; }
+        .checkbox-container { display: flex; gap: 15px; font-size: 0.8rem; color: #aaa; }
+        .checkbox-container label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .checkbox-container input[type="checkbox"] { cursor: pointer; accent-color: var(--neon); }
+        .counter-badge { background: #111; border: 1px solid var(--neon); color: var(--neon); padding: 6px 12px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; }
+
+        input, select { background: #000; border: 1px solid #444; color: white; border-radius: 5px; outline: none; }
+        input:focus, select:focus { border-color: var(--neon); }
+        
+        .btn-new-search { background: #ff4444; color: white; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 5px; text-transform: uppercase; font-size: 0.75rem; }
         .btn-new-search:hover { background: #cc0000; }
         
-        .filters-inline-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
-        .dynamic-filters-area { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
-        
-        .filter-tag { background: #222; border: 1px solid var(--neon); padding: 5px 10px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--neon); }
-        .filter-tag select { padding: 2px; font-size: 0.75rem; border: none; background: transparent; color: white; cursor: pointer; }
-        .filter-tag .remove { color: #ff4444; cursor: pointer; font-weight: bold; margin-left: 5px; }
-        
-        .counter-badge { background: #111; border: 1px solid var(--neon); color: var(--neon); padding: 4px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; }
+        .floating-menu { position: absolute; top: 100%; left: 0; width: 100%; background: #111; border: 1px solid var(--neon); z-index: 1000; max-height: 200px; overflow-y: auto; display: none; }
+        .menu-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #222; font-size: 0.8rem; }
+        .menu-item:hover { background: var(--neon); color: black; }
 
-        /* Estilos de Ficha Técnica Remodelada */
-        #dataSheet { border: 2px solid var(--neon); border-radius: 15px; padding: 25px; margin-bottom: 20px; display: none; box-shadow: var(--glow); position: relative; }
-        .sheet-plant { background: #0a0a0a; border-color: var(--neon) !important; }
-        .sheet-soil { background: #0c0905; border-color: gold !important; }
-        .ds-title-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #222; padding-bottom: 10px; margin-bottom: 20px; }
-        .btn-close-sheet { background: #ff4444; color: white; border: none; font-size: 1.2rem; font-weight: bold; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
-        .btn-close-sheet:hover { background: #cc0000; transform: scale(1.05); }
+        /* Ficha Técnica y Tablas */
+        #dataSheet { border: 2px solid var(--neon); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: none; box-shadow: var(--glow); background: var(--panel); }
+        .ds-title-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 15px; }
+        .btn-close-sheet { background: #ff4444; color: white; border: none; font-size: 1rem; font-weight: bold; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         
-        .groups-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .info-group-box { background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; }
-        .info-group-box h3 { margin-top: 0; color: var(--neon); font-size: 0.9rem; border-bottom: 1px solid #222; padding-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .info-box { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #222; font-size: 0.85rem; }
-        .info-box:last-child { border-bottom: none; }
-        .info-box b { color: #aaa; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
-        .info-box span { color: #fff; font-weight: bold; text-align: right; max-width: 60%; word-break: break-word; }
-        
-        table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; }
-        th { background: #1a1a1a; color: var(--neon); padding: 15px; text-align: left; font-size: 0.75rem; text-transform: uppercase; }
-        td { padding: 12px 15px; border-bottom: 1px solid #222; font-size: 0.85rem; }
+        .groups-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+        .info-group-box { background: #111; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+        .info-group-box h3 { margin-top: 0; color: var(--neon); font-size: 0.85rem; border-bottom: 1px solid #222; padding-bottom: 4px; text-transform: uppercase; }
+        .info-box { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #222; font-size: 0.8rem; }
+        .info-box span:first-child { color: #aaa; }
+
+        .results-area { width: 100%; overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+        th { background: #1a1a1a; color: var(--neon); padding: 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; border-bottom: 2px solid #222; }
+        td { padding: 10px 12px; border-bottom: 1px solid #222; font-size: 0.8rem; }
         tr.data-row:hover { background: #1a2e1a; cursor: pointer; }
         
-        .floating-menu { position: absolute; top: 100%; left: 0; width: 100%; background: #111; border: 1px solid var(--neon); z-index: 1000; max-height: 250px; overflow-y: auto; display: none; }
-        .menu-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #222; font-size: 0.85rem; }
-        .menu-item:hover { background: var(--neon); color: black; }
+        /* ----- AJUSTES SEGUROS PARA APILAMIENTO EN CELULARES ----- */
+        @media (max-width: 768px) {
+            body { padding: 8px; }
+            .control-panel { padding: 10px; gap: 10px; }
+            .top-action-bar, .search-inputs-row, .sub-controls-row, .footer-panel-row { flex-direction: column; align-items: stretch; gap: 10px; }
+            
+            .category-mini-select, .attr-search-block, .soil-search-block, .plant-name-block { width: 100% !important; max-width: 100% !important; }
+            .all-filters-wrapper { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+            .filter-item-box, .filter-item-box.height-box, .filter-tag, .dynamic-filters-area { width: 100% !important; }
+            
+            input, select, .btn-new-search, .btn-col-help { padding: 10px; font-size: 0.9rem; width: 100%; text-align: center; }
+            .counter-badge { width: 100%; justify-content: center; }
+        }
     </style>
 </head>
 <body>
 
 <div class="main-container">
     <div class="upload-zone" id="uploadZone">
-        <label style="display:block; margin-bottom:10px; color:#aaa; font-size:0.9rem;">Upload files to begin (Plants and inf.xlsx for Soil):</label>
+        <label style="display:block; margin-bottom:8px; color:#aaa; font-size:0.85rem;">Upload files to begin (Plants and inf.xlsx for Soil):</label>
         <input type="file" id="inPlants"> <input type="file" id="inSoil">
     </div>
 
     <div class="control-panel" id="mainPanel" style="opacity:0.5;">
         <div class="search-grid">
-            <div class="global-box">
-                <div class="global-header">
-                    <div class="header-left">
-                        <label style="color:var(--neon); font-size: 0.75rem; font-weight: bold; text-transform: uppercase; white-space: nowrap;">Global Search (Attributes or ?Names)</label>
-                        <div class="checkbox-container">
-                            <label><input type="checkbox" id="chkSkipRoses" onchange="applyFilters()"> Omitir Rosas</label>
-                            <label><input type="checkbox" id="chkSkipFruit" onchange="applyFilters()"> Omitir Fruit Tree</label>
-                        </div>
-                    </div>
-                    <div class="counter-badge" id="counterDisplay">Plants: 0 / 0</div>
-                </div>
-                
-                <div class="input-group">
-                    <input type="text" id="attrFinder" class="attr-input" placeholder="Type attributes, use ? separator..." autocomplete="off">
-                    <button class="btn-col-help" id="btnHelp" title="Toggle Column Filters">Column +</button>
-                </div>
-                <div id="attrMenu" class="floating-menu"></div> 
-                <div id="colMenu" class="floating-menu"></div> 
-                
+            
+            <!-- FILA ACCIONES SUPERIORES -->
+            <div class="top-action-bar">
                 <button class="btn-new-search" id="btnNewSearch">New Search</button>
+                
+                <select id="f-category" class="category-mini-select" onchange="applyFilters();">
+                    <option value="">All Categories</option>
+                </select>
+                
+                <button class="btn-col-help" id="btnHelp" title="Toggle Column Filters">Column +</button>
             </div>
 
-            <div class="right-box-wrapper">
-                <div style="position:relative;">
-                    <label style="color:gold; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 8px;">Soil Suggestion (inf.xlsx)</label>
-                    <input type="text" id="soilFinder" style="width:100%; box-sizing:border-box; border: 1px solid gold;" placeholder="Search soil..." autocomplete="off">
+            <!-- FILA PRINCIPAL: Atributos crece a la izquierda, Soil y Plant Name pequeños a la derecha -->
+            <div class="search-inputs-row">
+                <div class="attr-search-block">
+                    <input type="text" id="attrFinder" class="attr-input" placeholder="Search attributes..." autocomplete="off">
+                </div>
+
+                <div class="soil-search-block">
+                    <input type="text" id="soilFinder" class="soil-input" style="border-color: gold;" placeholder="Search soil (inf.xlsx)..." autocomplete="off">
                     <div id="soilMenu" class="floating-menu" style="border-color: gold;"></div>
                 </div>
-                
-                <div style="position:relative;">
-                    <label style="color:var(--neon); font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 8px;">Plant Name Search</label>
-                    <input type="text" id="plantNameFinder" style="width:100%; box-sizing:border-box; border: 1px solid var(--neon);" placeholder="Direct plant name search..." autocomplete="off">
+
+                <div class="plant-name-block">
+                    <input type="text" id="plantNameFinder" class="plant-input" placeholder="Direct plant name search..." autocomplete="off">
                     <div id="plantNameMenu" class="floating-menu"></div>
                 </div>
-
-                <!-- INTEGRACIÓN: COMBO BOX DE CATEGORÍA DEBAJO DE PLANT NAME SEARCH -->
-                <div style="position:relative;">
-                    <label style="color:var(--neon); font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 8px;">Plant Category</label>
-                    <select id="f-category" style="width:100%; box-sizing:border-box; border: 1px solid var(--neon); background:#000;" onchange="applyFilters();">
-                        <option value="">All Categories</option>
-                    </select>
-                </div>
             </div>
-        </div>
 
-        <div class="filter-row" style="display:flex; gap:15px; background:#0c0c0c; padding:10px; border-radius:8px; align-items: flex-end; justify-content: space-between;">
-            <div class="filters-inline-container">
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                    <label style="font-size:0.6rem; color:#888; text-transform: uppercase;">Height (ft)</label>
-                    <div style="display:flex; gap:5px;">
-                        <input type="number" id="h-min" min="0" style="width:70px; padding:5px;" placeholder="Min" oninput="validateAndApplyHeight();">
-                        <input type="number" id="h-max" min="0" style="width:70px; padding:5px;" placeholder="Max" oninput="validateAndApplyHeight();">
+            <!-- FILA SUB-CONTROLES UNIFICADA -->
+            <div class="sub-controls-row">
+                <div class="all-filters-wrapper">
+                    <!-- Filtros Fijos -->
+                    <div class="filter-item-box height-box">
+                        <label>H.(Min/Max)</label>
+                        <div style="display:flex; gap:2px;">
+                            <input type="number" id="h-min" min="0" placeholder="Min" oninput="validateAndApplyHeight();">
+                            <input type="number" id="h-max" min="0" placeholder="Max" oninput="validateAndApplyHeight();">
+                        </div>
                     </div>
+                    <div class="filter-item-box">
+                        <label>Light</label>
+                        <select id="f-light" onchange="syncStaticFilterToBox('light', this.value)"><option value="">All</option></select>
+                    </div>
+                    <div class="filter-item-box">
+                        <label>Foliage</label>
+                        <select id="f-foliage" onchange="syncStaticFilterToBox('foliage', this.value)"><option value="">All</option></select>
+                    </div>
+
+                    <!-- Filtros Dinámicos (Empiezan inmediatamente aquí al lado) -->
+                    <div id="dynamicFilters" class="dynamic-filters-area"></div>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                    <label style="font-size:0.6rem; color:#888; text-transform: uppercase;">Light Requirement</label>
-                    <select id="f-light" style="padding:5px;" onchange="syncStaticFilterToBox('light', this.value)"><option value="">All Light</option></select>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                    <label style="font-size:0.6rem; color:#888; text-transform: uppercase;">Foliage</label>
-                    <select id="f-foliage" style="padding:5px;" onchange="syncStaticFilterToBox('foliage', this.value)"><option value="">All Foliage</option></select>
-                </div>
-                
-                <div id="dynamicFilters" class="dynamic-filters-area"></div>
             </div>
+
+            <!-- FILA FINAL: Checkboxes y Contador -->
+            <div class="footer-panel-row">
+                <div class="checkbox-container">
+                    <label><input type="checkbox" id="chkSkipRoses" onchange="applyFilters()"> Omitir Rosas</label>
+                    <label><input type="checkbox" id="chkSkipFruit" onchange="applyFilters()"> Omitir Fruit Tree</label>
+                </div>
+                <div class="counter-badge" id="counterDisplay">Plants: 0 / 0</div>
+            </div>
+
+            <!-- Capa técnica oculta para menús flotantes compartidos -->
+            <div style="position: relative; width: 100%; height: 0; margin: 0; padding: 0;">
+                <div id="attrMenu" class="floating-menu"></div> 
+                <div id="colMenu" class="floating-menu"></div> 
+            </div>
+
         </div>
     </div>
 
+    <!-- Ficha Técnica -->
     <div id="dataSheet">
         <div class="ds-title-container">
-            <h2 id="ds-name" style="margin:0;"></h2>
+            <h2 id="ds-name" style="margin:0; font-size: 1.1rem;"></h2>
             <button class="btn-close-sheet" onclick="closeDataSheet()" title="Close Details">×</button>
         </div>
         <div class="groups-wrapper" id="ds-content"></div>
     </div>
 
+    <!-- Tabla de resultados -->
     <div class="results-area">
         <table id="mainTable">
             <thead id="tableHead"></thead>
@@ -175,11 +226,30 @@
         light: 'Light_Requirement',
         foliage: 'Foliage',
         height: 'Height',
-        category: 'Category' // Mapeo de la columna Category
+        category: 'Category'
     };
 
     document.getElementById('inPlants').addEventListener('change', (e) => loadXls(e, 'plants'));
     document.getElementById('inSoil').addEventListener('change', (e) => loadXls(e, 'soil'));
+
+    // Configuración de botón "New Search"
+    document.getElementById('btnNewSearch').addEventListener('click', () => {
+        document.getElementById('attrFinder').value = "";
+        document.getElementById('soilFinder').value = "";
+        document.getElementById('plantNameFinder').value = "";
+        document.getElementById('h-min').value = "";
+        document.getElementById('h-max').value = "";
+        document.getElementById('f-light').value = "";
+        document.getElementById('f-foliage').value = "";
+        document.getElementById('f-category').value = "";
+        document.getElementById('chkSkipRoses').checked = false;
+        document.getElementById('chkSkipFruit').checked = false;
+        document.getElementById('dynamicFilters').innerHTML = "";
+        activeDynamicFilters = {};
+        lastSelectedFilters = { light: '', foliage: '' };
+        closeDataSheet();
+        applyFilters();
+    });
 
     function loadXls(e, type) {
         const file = e.target.files[0];
@@ -209,7 +279,7 @@
                 });
                 colNames = db.length > 0 ? Object.keys(db[0]) : [];
                 setupStaticFilters();
-                setupCategoryFilter(); // Llenar el combo de categorías
+                setupCategoryFilter();
             } else { 
                 soilDb = json; 
             }
@@ -226,20 +296,15 @@
             const col = id === 'f-light' ? mappedCols.light : mappedCols.foliage;
             const vals = [...new Set(db.map(p => p[col]))].filter(Boolean).sort();
             const sel = document.getElementById(id);
-            const labelWord = id === 'f-light' ? 'Light' : 'Foliage';
-            sel.innerHTML = `<option value="">All ${labelWord}</option>`;
+            sel.innerHTML = `<option value="">All</option>`;
             vals.forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
         });
     }
 
-    // Lógica para poblar el combo box de categorías de forma dinámica
     function setupCategoryFilter() {
         const selCategory = document.getElementById('f-category');
         if (!selCategory) return;
-        
-        // Extraer valores únicos de la columna Category
         const uniqueCategories = [...new Set(db.map(p => p[mappedCols.category]))].filter(Boolean).sort();
-        
         selCategory.innerHTML = '<option value="">All Categories</option>';
         uniqueCategories.forEach(cat => {
             selCategory.innerHTML += `<option value="${cat}">${cat}</option>`;
@@ -294,25 +359,6 @@
         if (hMinInput.value && parseFloat(hMinInput.value) < 0) hMinInput.value = 0;
         if (hMaxInput.value && parseFloat(hMaxInput.value) < 0) hMaxInput.value = 0;
         applyFilters();
-    }
-
-    function parseHeightRange(heightStr) {
-        if(!heightStr) return { min: 0, max: 0 };
-        let str = String(heightStr).toLowerCase().replace(/\s+/g, '');
-        let unit = 'ft'; 
-        if (str.includes('in') || str.includes('inch')) unit = 'in';
-        if (str.includes('ft') || str.includes('\'')) unit = 'ft';
-        let cleanStr = str.replace(/[a-z']/g, ''); 
-        let rawMin = 0; let rawMax = 0;
-
-        if (cleanStr.includes('-')) {
-            let parts = cleanStr.split('-');
-            rawMin = parseFloat(parts[0]) || 0;
-            rawMax = parseFloat(parts[1]) || rawMin; 
-        } else {
-            rawMin = parseFloat(cleanStr) || 0; rawMax = rawMin; 
-        }
-        return { min: (unit === 'ft') ? rawMin * 12 : rawMin, max: (unit === 'ft') ? rawMax * 12 : rawMax };
     }
 
     function clearInputsExcept(activeInputId) {
@@ -453,9 +499,7 @@
             const val = e.target.dataset.val;
             soilInput.value = val;
             soilMenu.style.display = 'none';
-            document.getElementById('tableBody').innerHTML = "";
-            document.getElementById('counterDisplay').innerText = `Plants: 0 / ${db.length}`;
-            showDetail(val, 'soil');
+            applyFilters();
         }
 
         if(e.target.classList.contains('plant-suggestion')) {
@@ -466,14 +510,13 @@
             hMaxInput.value = "";
             document.getElementById('f-light').value = "";
             document.getElementById('f-foliage').value = "";
-            document.getElementById('f-category').value = ""; // Limpieza del filtro category
+            document.getElementById('f-category').value = "";
             document.getElementById('dynamicFilters').innerHTML = "";
             activeDynamicFilters = {};
             lastSelectedFilters = { light: '', foliage: '' };
             plantNameInput.value = targetPlantName;
             plantNameMenu.style.display = 'none';
             applyFilters();
-            showDetail(targetPlantName, 'plant');
         }
         if(e.target.classList.contains('col-opt')) {
             addFilterTag(e.target.dataset.col, "");
@@ -489,15 +532,18 @@
         tag.id = `tag-container-${col.replace(/ /g, '_')}`;
         tag.dataset.linkedWord = initialValue; 
 
-        tag.innerHTML = `<span>${col.replace(/_/g,' ').toUpperCase()}</span>
+        tag.innerHTML = `
+            <div class="tag-label-container">
+                <span>${col.replace(/_/g,' ').toUpperCase()}</span>
+                <span class="remove" onclick="removeFilter('${col}', this)">×</span>
+            </div>
             <select id="sel-dyn-${col.replace(/ /g, '_')}" onchange="updateDynFilter('${col}', this.value)">
                 <option value="">Any</option>
                 ${vals.map(v => {
                     let selected = v.toLowerCase() === initialValue.toLowerCase() ? 'selected' : '';
                     return `<option value="${v}" ${selected}>${v}</option>`;
                 }).join('')}
-            </select>
-            <span class="remove" onclick="removeFilter('${col}', this)">×</span>`;
+            </select>`;
         document.getElementById('dynamicFilters').appendChild(tag);
         activeDynamicFilters[col] = initialValue || "";
         applyFilters();
@@ -506,7 +552,7 @@
     window.updateDynFilter = (col, val) => { activeDynamicFilters[col] = val; applyFilters(); };
 
     window.removeFilter = (col, el) => {
-        const parentTag = el.parentElement;
+        const parentTag = el.closest('.filter-tag');
         const linkedWord = parentTag.dataset.linkedWord ? parentTag.dataset.linkedWord.toLowerCase() : '';
         delete activeDynamicFilters[col]; 
         parentTag.remove(); 
@@ -519,207 +565,172 @@
         applyFilters(); 
     };
 
+    // --- LOGICA DEL MOTOR DE BUSQUEDA RESTABLECIDA ---
     function applyFilters() {
-        if (db.length === 0) { renderTable([], []); return; }
+        if (db.length === 0) return;
 
-        const globalVal = attrInput.value.toLowerCase();
-        const searchNames = globalVal.startsWith('?');
-        const terms = (searchNames ? globalVal.substring(1) : globalVal).split(/[\s?]+/).filter(t => t.length > 0);
-        const plantNameVal = plantNameInput.value.toLowerCase().trim();
-
-        const userMinInches = hMinInput.value ? Math.max(0, parseInt(hMinInput.value, 10)) * 12 : 0;
-        const userMaxInches = hMaxInput.value ? Math.max(0, parseInt(hMaxInput.value, 10)) * 12 : 999999;
-
-        const fLight = document.getElementById('f-light').value;
-        const fFoliage = document.getElementById('f-foliage').value;
-        const fCategory = document.getElementById('f-category').value; // Lectura del valor del combo box Category
-
+        const attrVal = document.getElementById('attrFinder').value.trim().toLowerCase();
+        const soilVal = document.getElementById('soilFinder').value.trim().toLowerCase();
+        const plantNameVal = document.getElementById('plantNameFinder').value.trim().toLowerCase();
+        const catVal = document.getElementById('f-category').value;
+        const minH = parseFloat(document.getElementById('h-min').value) || 0;
+        const maxH = parseFloat(document.getElementById('h-max').value) || Infinity;
         const skipRoses = document.getElementById('chkSkipRoses').checked;
         const skipFruit = document.getElementById('chkSkipFruit').checked;
 
-        let dynamicColsToRender = new Set();
-        for(let col in activeDynamicFilters) {
-            if(activeDynamicFilters[col]) dynamicColsToRender.add(col);
-        }
+        let filtered = db.filter(p => {
+            // Filtro Omitir Rosas
+            if (skipRoses && String(p[mappedCols.common_name] || '').toLowerCase().includes('rose')) return false;
+            // Filtro Omitir Fruit Trees
+            if (skipFruit && String(p[mappedCols.category] || '').toLowerCase().includes('fruit tree')) return false;
+            // Filtro Categoría Superior
+            if (catVal && p[mappedCols.category] !== catVal) return false;
 
-        const filtered = db.filter(p => {
-            const commonName = String(p[mappedCols.common_name] || '').toLowerCase();
-            const botanicalName = String(p[mappedCols.botanical_name] || '').toLowerCase();
-            const combinedNames = commonName + " " + botanicalName;
-
-            if (skipRoses && combinedNames.includes('rose')) return false;
-            if (skipFruit && combinedNames.includes('fruit tree')) return false;
-            if(plantNameVal.length > 0 && !combinedNames.includes(plantNameVal)) return false;
-
-            // Filtro por combo box Category
-            if(fCategory && p[mappedCols.category] !== fCategory) return false;
-
-            if(terms.length > 0) {
-                const targetText = searchNames ? combinedNames : Object.values(p).join(' ').toLowerCase();
-                if(!terms.every(t => targetText.includes(t))) return false;
-                terms.forEach(t => { if(attrToColumnMap[t]) dynamicColsToRender.add(attrToColumnMap[t]); });
+            // Filtro por Nombre Directo de Planta
+            if (plantNameVal) {
+                const cName = String(p[mappedCols.common_name] || '').toLowerCase();
+                const bName = String(p[mappedCols.botanical_name] || '').toLowerCase();
+                if (!cName.includes(plantNameVal) && !bName.includes(plantNameVal)) return false;
             }
 
-            for(let col in activeDynamicFilters) {
-                if(activeDynamicFilters[col] && String(p[col]).toLowerCase() !== activeDynamicFilters[col].toLowerCase()) return false;
+            // Filtro por Altura
+            const hVal = parseFloat(p[mappedCols.height]) || 0;
+            if (hVal < minH || hVal > maxH) return false;
+
+            // Filtro Estático: Light
+            const lightSelect = document.getElementById('f-light').value;
+            if (lightSelect && p[mappedCols.light] !== lightSelect) return false;
+
+            // Filtro Estático: Foliage
+            const foliageSelect = document.getElementById('f-foliage').value;
+            if (foliageSelect && p[mappedCols.foliage] !== foliageSelect) return false;
+
+            // Filtros Dinámicos de Columnas Adicionales (Column +)
+            for (let col in activeDynamicFilters) {
+                let requiredVal = activeDynamicFilters[col];
+                if (requiredVal && p[col] !== requiredVal) return false;
             }
 
-            if(fLight && p[mappedCols.light] !== fLight) return false;
-            if(fFoliage && p[mappedCols.foliage] !== fFoliage) return false;
-
-            if(hMinInput.value || hMaxInput.value) {
-                const plantHeight = parseHeightRange(p[mappedCols.height]);
-                if(plantHeight.min < userMinInches || plantHeight.max > userMaxInches) return false;
+            // Filtro Avanzado Multi-Atributo por Espacios (?) o Normales
+            if (attrVal) {
+                const tokens = attrVal.replace(/\?/g, ' ').split(/\s+/).filter(t => t.length > 0);
+                // Todas las palabras/tokens deben encontrarse en algún campo del registro
+                for (let token of tokens) {
+                    let tokenFound = false;
+                    for (let key in p) {
+                        if (String(p[key]).toLowerCase().includes(token)) {
+                            tokenFound = true;
+                            break;
+                        }
+                    }
+                    if (!tokenFound) return false;
+                }
             }
+
+            // Filtro cruzado con archivo de Suelos (inf.xlsx)
+            if (soilVal && soilDb.length > 0) {
+                const firstSoilCol = Object.keys(soilDb[0])[0];
+                const matchedSoilRows = soilDb.filter(s => String(s[firstSoilCol] || '').toLowerCase().includes(soilVal));
+                
+                if (matchedSoilRows.length > 0) {
+                    let matchesAnySoilCriteria = false;
+                    for (let sRow of matchedSoilRows) {
+                        let rowMatch = true;
+                        for (let sKey in sRow) {
+                            if (sKey === firstSoilCol) continue;
+                            let critVal = String(sRow[sKey] || '').trim().toLowerCase();
+                            if (critVal.length > 0) {
+                                // Buscar si la planta cumple con el criterio de esta columna de suelos
+                                if (p[sKey] === undefined || !String(p[sKey]).toLowerCase().includes(critVal)) {
+                                    rowMatch = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (rowMatch) { matchesAnySoilCriteria = true; break; }
+                    }
+                    if (!matchesAnySoilCriteria) return false;
+                }
+            }
+
             return true;
         });
 
+        // Actualizar contador visual
         document.getElementById('counterDisplay').innerText = `Plants: ${filtered.length} / ${db.length}`;
-        renderTable(filtered, Array.from(dynamicColsToRender));
+
+        // Construir Cabeceras y Renderizar Tabla
+        renderTable(filtered);
     }
 
-    function renderTable(data, dynamicColumns) {
-        const fixedHeaders = [
-            { key: mappedCols.common_name, label: 'COMMON NAME' },
-            { key: mappedCols.light, label: 'LIGHT' },
-            { key: mappedCols.foliage, label: 'FOLIAGE' },
-            { key: mappedCols.height, label: 'HEIGHT' }
-        ];
-
+    function renderTable(data) {
         const thead = document.getElementById('tableHead');
-        let headerHtml = '<tr>';
-        fixedHeaders.forEach(h => headerHtml += `<th>${h.label}</th>`);
-        dynamicColumns.forEach(col => {
-            if(!Object.values(mappedCols).includes(col)) {
-                headerHtml += `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`;
-            }
-        });
-        headerHtml += '</tr>';
-        thead.innerHTML = headerHtml;
-
         const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = data.map(p => {
-            let rowHtml = `<tr class="data-row" onclick="showDetail('${p[mappedCols.common_name] || p[mappedCols.botanical_name]}', 'plant')">`;
-            rowHtml += `<td>${p[mappedCols.common_name] || '---'}</td>`;
-            rowHtml += `<td>${p[mappedCols.light] || '---'}</td>`;
-            rowHtml += `<td>${p[mappedCols.foliage] || '---'}</td>`;
-            rowHtml += `<td>${p[mappedCols.height] || '---'}</td>`;
-            dynamicColumns.forEach(col => {
-                if(!Object.values(mappedCols).includes(col)) {
-                    rowHtml += `<td>${p[col] || '---'}</td>`;
-                }
-            });
-            rowHtml += `</tr>`;
-            return rowHtml;
-        }).join('');
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No plants match the criteria.</td></tr>`;
+            return;
+        }
+
+        // Columnas principales a mostrar en la vista general compacta
+        const headers = [mappedCols.common_name, mappedCols.botanical_name, mappedCols.category, mappedCols.light];
+        
+        // Crear cabecera HTML
+        let headRow = "<tr>";
+        headers.forEach(h => {
+            headRow += `<th>${h.replace(/_/g, ' ')}</th>`;
+        });
+        headRow += "</tr>";
+        thead.innerHTML = headRow;
+
+        // Crear filas de datos
+        data.forEach((plant, index) => {
+            const tr = document.createElement('tr');
+            tr.className = "data-row";
+            tr.innerHTML = headers.map(h => `<td>${plant[h] || '-'}</td>`).join('');
+            tr.addEventListener('click', () => openDataSheet(plant));
+            tbody.appendChild(tr);
+        });
     }
 
-    document.getElementById('btnNewSearch').addEventListener('click', () => {
-        attrInput.value = "";
-        plantNameInput.value = "";
-        soilInput.value = "";
-        hMinInput.value = "";
-        hMaxInput.value = "";
-        document.getElementById('chkSkipRoses').checked = false;
-        document.getElementById('chkSkipFruit').checked = false;
-        document.getElementById('f-light').value = "";
-        document.getElementById('f-foliage').value = "";
-        document.getElementById('f-category').value = ""; // CORRECCIÓN: Reinicio explícito de Category
-        document.getElementById('dynamicFilters').innerHTML = "";
-        activeDynamicFilters = {};
-        lastSelectedFilters = { light: '', foliage: '' };
-        closeDataSheet();
-        applyFilters();
-    });
-
-    function showDetail(name, type) {
-        if(!name) return;
+    // --- LÓGICA DE LA FICHA TÉCNICA DETALLADA ---
+    function openDataSheet(plant) {
         const sheet = document.getElementById('dataSheet');
-        const contentArea = document.getElementById('ds-content');
-        
-        contentArea.innerHTML = ""; 
+        const title = document.getElementById('ds-name');
+        const content = document.getElementById('ds-content');
 
-        if (type === 'plant') {
-            const p = db.find(x => 
-                (x[mappedCols.common_name]||'').toUpperCase() === name.toUpperCase() || 
-                (x[mappedCols.botanical_name]||'').toUpperCase() === name.toUpperCase()
-            );
-            if(!p) return;
-            
-            sheet.className = "sheet-plant";
-            sheet.style.display = 'block';
-            document.getElementById('ds-name').innerText = `🌿 PLANT: ${(p[mappedCols.common_name] || p[mappedCols.botanical_name]).toUpperCase()}`;
-            
-            let groups = {
-                identity: { title: "📋 Main Identity", html: "" },
-                growth: { title: "🌱 Growth & Size", html: "" },
-                requirements: { title: "☀️ Requirements", html: "" },
-                additional: { title: "🌟 Additional Details", html: "" }
-            };
+        title.innerText = plant[mappedCols.common_name] || plant[mappedCols.botanical_name] || "Plant Details";
+        content.innerHTML = "";
 
-            Object.keys(p).forEach(k => {
-                let keyLower = k.toLowerCase();
-                let val = p[k] || '---';
-                let boxHtml = `<div class="info-box"><b>${k.replace(/_/g,' ')}</b><span>${val}</span></div>`;
+        // Dividir las columnas en grupos lógicos de 5 elementos para una organización visual balanceada
+        let currentBox = null;
+        let count = 0;
 
-                if(keyLower.includes('name') || keyLower.includes('botanical') || keyLower.includes('type') || keyLower.includes('id')) {
-                    groups.identity.html += boxHtml;
-                } else if(keyLower.includes('height') || keyLower.includes('size') || keyLower.includes('foliage') || keyLower.includes('growth') || keyLower.includes('spread')) {
-                    groups.growth.html += boxHtml;
-                } else if(keyLower.includes('light') || keyLower.includes('water') || keyLower.includes('soil') || keyLower.includes('zone') || keyLower.includes('requirement') || keyLower.includes('tolerat')) {
-                    groups.requirements.html += boxHtml;
-                } else {
-                    groups.additional.html += boxHtml;
-                }
-            });
+        colNames.forEach((col) => {
+            if (plant[col] === undefined || plant[col] === null || String(plant[col]).trim() === "") return;
 
-            let finalHtml = "";
-            Object.keys(groups).forEach(gKey => {
-                if(groups[gKey].html.length > 0) {
-                    finalHtml += `<div class="info-group-box"><h3>${groups[gKey].title}</h3>${groups[gKey].html}</div>`;
-                }
-            });
-            contentArea.innerHTML = finalHtml;
+            if (count % 5 === 0) {
+                currentBox = document.createElement('div');
+                currentBox.className = 'info-group-box';
+                currentBox.innerHTML = `<h3>Data Group ${Math.floor(count/5) + 1}</h3>`;
+                content.appendChild(currentBox);
+            }
 
-        } else if (type === 'soil') {
-            const firstCol = Object.keys(soilDb[0])[0];
-            const s = soilDb.find(x => String(x[firstCol]).toUpperCase() === name.toUpperCase());
-            if(!s) return;
+            const infoBox = document.createElement('div');
+            infoBox.className = 'info-box';
+            infoBox.innerHTML = `<span>${col.replace(/_/g, ' ')}:</span> <span>${plant[col]}</span>`;
+            currentBox.appendChild(infoBox);
+            count++;
+        });
 
-            sheet.className = "sheet-soil";
-            sheet.style.display = 'block';
-            document.getElementById('ds-name').innerText = `⏳ SOIL TYPE: ${String(s[firstCol]).toUpperCase()}`;
-
-            let groups = {
-                properties: { title: "🪵 Soil Properties & Type", html: "" },
-                chemical: { title: "🧪 Chemistry & Components", html: "" }
-            };
-
-            Object.keys(s).forEach(k => {
-                let keyLower = k.toLowerCase();
-                let val = s[k] || '---';
-                let boxHtml = `<div class="info-box"><b>${k.replace(/_/g,' ')}</b><span>${val}</span></div>`;
-
-                if(keyLower.includes('ph') || keyLower.includes('nitrogen') || keyLower.includes('phosphorus') || keyLower.includes('potassium') || keyLower.includes('chemical')) {
-                    groups.chemical.html += boxHtml;
-                } else {
-                    groups.properties.html += boxHtml;
-                }
-            });
-
-            let finalHtml = "";
-            Object.keys(groups).forEach(gKey => {
-                if(groups[gKey].html.length > 0) {
-                    finalHtml += `<div class="info-group-box"><h3>${groups[gKey].title}</h3>${groups[gKey].html}</div>`;
-                }
-            });
-            contentArea.innerHTML = finalHtml;
-        }
-        sheet.scrollIntoView({behavior:'smooth'});
+        sheet.style.display = "block";
+        sheet.scrollIntoView({ behavior: 'smooth' });
     }
 
     function closeDataSheet() {
-        document.getElementById('dataSheet').style.display = 'none';
+        document.getElementById('dataSheet').style.display = "none";
     }
 </script>
 </body>
