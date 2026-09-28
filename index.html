@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Everde · Inventory Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --paper: #EEF0E6;
+    --paper-2: #E4E7D9;
+    --ink: #1E2A1B;
+    --ink-soft: #4A5646;
+    --forest: #24391F;
+    --forest-2: #35502C;
+    --moss: #6E8B5C;
+    --amber: #B4832F;
+    --amber-deep: #8F651F;
+    --line: #C9CDB8;
+    --card: #F7F8F1;
+    --white: #FFFDF8;
+    --danger: #A34327;
+    --danger-bg: rgba(163,67,39,0.16);
+    --danger-bg-strong: rgba(163,67,39,0.26);
+    --radius: 3px;
+    --shadow: 0 1px 0 rgba(30,42,27,0.06);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #161C13;
+      --paper-2: #1D2418;
+      --ink: #E9ECE2;
+      --ink-soft: #AEB6A2;
+      --forest: #A9C79A;
+      --forest-2: #C4DDB6;
+      --moss: #8FAE79;
+      --amber: #D6A24F;
+      --amber-deep: #E3B565;
+      --line: #34402C;
+      --card: #1F261A;
+      --white: #222A1C;
+      --danger: #E08560;
+      --danger-bg: rgba(224,133,96,0.18);
+      --danger-bg-strong: rgba(224,133,96,0.30);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #161C13; --paper-2: #1D2418; --ink: #E9ECE2; --ink-soft: #AEB6A2;
+    --forest: #A9C79A; --forest-2: #C4DDB6; --moss: #8FAE79; --amber: #D6A24F;
+    --amber-deep: #E3B565; --line: #34402C; --card: #1F261A; --white: #222A1C;
+    --danger: #E08560; --danger-bg: rgba(224,133,96,0.18); --danger-bg-strong: rgba(224,133,96,0.30);
+  }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  a { color: inherit; }
+
+  /* Header uses fixed (theme-independent) colors: it must always read as a
+     dark green bar with light text, regardless of the visitor's OS theme.
+     The whole control panel (header + filter bar) stays fixed; only the
+     results below it scroll. */
+  .control-panel {
+    position: sticky; top: 0; z-index: 30;
+  }
+  header.top {
+    background: #1E3319; color: #F4F2E8;
+    padding: env(safe-area-inset-top, 0px) 0 0 0;
+  }
+  .top-inner {
+    max-width: 1400px; margin: 0 auto; padding: 9px 24px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .brand {
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 18px;
+    color: #FFFFFF; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .brand .header-file { font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 12.5px; color: #F4F2E8; }
+  .brand .header-updated { font-family: "IBM Plex Sans", sans-serif; font-weight: 400; font-size: 12px; color: #C9D3BE; }
+  .brand .header-dot { color: #C9D3BE; opacity: 0.6; }
+  .header-yard { margin-left: auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .header-yard label { color: #E5EBDD; font-size: 11px; font-weight: 600; }
+  .header-yard select { max-width: 220px; min-width: 150px; background-color: #F7F8F1; color: #1E2A1B; }
+  .header-yard .refresh-link { color: #E5EBDD; margin: 0; }
+  .filter-drawer-title, .filter-tab, .filter-backdrop { display: none; }
+
+  main.results-full { max-width: 1400px; margin: 0 auto; padding: 14px 24px 60px; }
+
+  .filter-bar {
+    background: var(--card); border-bottom: 3px solid var(--amber);
+    padding: 10px 24px;
+  }
+  .filter-bar-inner { max-width: 1400px; margin: 0 auto; }
+  .filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 10px; }
+  .filter-row-right { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; }
+  .f-item { display: flex; flex-direction: column; gap: 3px; }
+  .f-item label {
+    font-size: 10px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .f-item select { width: auto; min-width: 110px; }
+  .f-item-yard select { min-width: 190px; font-weight: 600; }
+
+  .reset-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .reset-btn.filter-active { background-color: var(--danger-bg); border-color: var(--danger); color: var(--danger); font-weight: 600; }
+
+  select {
+    padding: 8px 10px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--white); color: var(--ink);
+    font-family: inherit; font-size: 13.5px; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%), linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+  }
+  select.filter-active {
+    border-color: var(--danger);
+    border-width: 2px;
+    font-weight: 600;
+    background-image: linear-gradient(45deg, transparent 50%, var(--danger) 50%), linear-gradient(135deg, var(--danger) 50%, transparent 50%);
+  }
+  select:focus, .reset-btn:focus-visible, .google-style-btn:focus-visible, .order-btn:focus-visible {
+    outline: 2px solid var(--amber); outline-offset: 1px;
+  }
+
+  /* row 2: Google-style search box + size filter, with the buttons below */
+  .google-search-row { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0 4px; margin-top: 8px; border-top: 1px solid var(--line); }
+  .search-line { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 680px; }
+  .search-wrap-google { position: relative; flex: 1; }
+  .search-wrap-google svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); opacity: 0.45; z-index: 1; }
+  .search-wrap-google input[type="search"] {
+    width: 100%; padding: 11px 18px 11px 42px; border-radius: 24px;
+    border: 1px solid var(--line); background: var(--white); color: var(--ink);
+    font-family: inherit; font-size: 15px; box-shadow: 0 0 0 1px rgba(110,139,92,.26), 0 1px 6px rgba(30,42,27,0.12);
+    transition: border-color .12s ease, background-color .12s ease, box-shadow .12s ease;
+  }
+  .search-wrap-google input[type="search"]:focus { box-shadow: 0 1px 8px rgba(180,131,47,0.30); border-color: var(--amber); }
+  .search-wrap-google input[type="search"].filter-active { border-color: var(--danger); background-color: var(--danger-bg); }
+  .size-filter-wrap { flex-shrink: 0; width: 130px; }
+  .size-filter-wrap input {
+    width: 100%; padding: 10px 12px; border-radius: 20px; border: 1px solid var(--line);
+    background: var(--white); color: var(--ink); font-family: inherit; font-size: 13.5px;
+    box-shadow: 0 0 0 1px rgba(110,139,92,.26), 0 1px 6px rgba(30,42,27,0.12);
+    transition: border-color .12s ease, background-color .12s ease;
+  }
+  .size-filter-wrap input:focus { outline: none; border-color: var(--amber); }
+  .size-filter-wrap input.filter-active { border-color: var(--danger); border-width: 2px; }
+  .google-btns-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .google-style-btn {
+    padding: 9px 20px; border-radius: 4px; border: 1px solid var(--line);
+    background: var(--white); color: var(--ink); font-family: inherit; font-size: 13px;
+    cursor: pointer; box-shadow: 0 1px 2px rgba(30,42,27,0.12);
+    transition: box-shadow .1s ease, border-color .1s ease, background-color .1s ease;
+  }
+  .google-style-btn:hover { border-color: var(--moss); box-shadow: 0 2px 6px rgba(30,42,27,0.18); background: var(--paper-2); }
+
+  /* row 3: create order on the left, classic view on the right */
+  .order-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 10px; margin-top: 4px; border-top: 1px dashed var(--line); }
+  .order-row-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .order-btn:disabled { background: var(--paper-2); border-color: var(--line); color: var(--ink-soft); cursor: not-allowed; }
+  .close-order-btn {
+    padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--danger); background: var(--white);
+    color: var(--danger); font-family: inherit; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .close-order-btn:hover { background: var(--danger-bg); }
+
+  /* quick "add" button (green, shaped like a recognizable "add" icon); small so it
+     doesn't compete visually with the size — only shown when an order is active (see JS) */
+  .quick-add-btn {
+    display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px;
+    border-radius: 50%; border: none; background: #3E8E4F; color: #fff; cursor: pointer; padding: 0;
+    margin-left: 3px; flex-shrink: 0; box-shadow: 0 1px 1px rgba(0,0,0,0.18); vertical-align: middle;
+  }
+  .quick-add-btn:hover { background: #2F6E3B; }
+  .quick-add-btn svg { width: 8px; height: 8px; }
+
+  /* ---- panel lateral de la orden (lado derecho de la pantalla) ---- */
+  .order-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 300px; max-width: 90vw; z-index: 60;
+    background: var(--white); border-left: 1px solid var(--line); box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+    display: flex; flex-direction: column; transition: transform .2s ease;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .order-panel.collapsed {
+    transform: translateX(105%); pointer-events: none;
+  }
+  .order-tab { display: none; position: fixed; right: 0; top: 61%; z-index: 61; width: 17px; height: 80px; align-items: center; justify-content: center; padding: 0; border: 1px solid rgba(180,131,47,.35); border-right: 0; border-radius: 8px 0 0 8px; background: rgba(180,131,47,.35); color: var(--ink); font-size: 15px; cursor: pointer; backdrop-filter: blur(5px); }
+  .order-tab.visible { display: flex; }
+  .order-panel-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 14px; background: var(--forest); color: #F4F2E8; font-weight: 600; font-size: 13.5px;
+  }
+  .order-panel-header .oph-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oph-close {
+    background: rgba(255,255,255,0.12); border: none; color: #fff; width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; flex-shrink: 0;
+  }
+  .oph-close:hover { background: rgba(255,255,255,0.24); }
+  .order-panel-body { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .op-yard-group + .op-yard-group { border-top: 1px dashed var(--line); }
+  .op-yard-label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    color: var(--forest-2); background: rgba(110,139,92,0.12); padding: 5px 14px;
+  }
+  .op-row {
+    display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 12.5px;
+    border-bottom: 1px solid var(--paper-2);
+  }
+  .op-row .op-size { font-weight: 700; color: var(--amber-deep); flex-shrink: 0; min-width: 44px; }
+  .op-row .op-name { flex: 1; color: var(--ink); line-height: 1.25; }
+  .op-row .op-qty { font-size: 11px; color: var(--ink-soft); flex-shrink: 0; }
+  .op-remove {
+    background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 14px;
+    padding: 0 2px; flex-shrink: 0; line-height: 1;
+  }
+  .op-remove:hover { color: var(--danger); }
+  .op-empty { padding: 24px 14px; text-align: center; color: var(--ink-soft); font-size: 12.5px; }
+  .order-panel-footer { padding: 10px 14px; border-top: 1px solid var(--line); }
+  .export-order-btn {
+    width: 100%; padding: 10px; border-radius: var(--radius); border: 1px solid var(--amber-deep);
+    background: var(--amber); color: #fff; font-weight: 600; font-family: inherit; font-size: 13.5px; cursor: pointer;
+  }
+  .export-order-btn:hover { background: var(--amber-deep); }
+
+  .view-toggle {
+    display: flex; align-items: center; gap: 6px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--white);
+    font-size: 12.5px; color: var(--ink); cursor: pointer; white-space: nowrap; height: 30px;
+  }
+  .view-toggle input { width: 14px; height: 14px; accent-color: var(--forest); cursor: pointer; }
+  .view-toggle:has(input:checked) { border-color: var(--moss); background: rgba(110,139,92,0.12); font-weight: 600; }
+
+  /* "Refresh" as a word above the Yard combobox, styled as a subtle button */
+  .refresh-link {
+    align-self: flex-start; padding: 1px 4px; margin: -1px -4px 1px; border: none; background: none;
+    color: var(--ink-soft); font-family: inherit; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.2px; cursor: pointer; border-radius: 3px; transition: background-color .1s ease, color .1s ease;
+  }
+  .refresh-link:hover { background: rgba(180,131,47,0.16); color: var(--amber-deep); }
+
+  /* ---- classic table view ---- */
+  .classic-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table.classic-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .classic-table thead th {
+    position: sticky; top: 0; background: var(--forest); color: #F4F2E8;
+    text-align: left; padding: 7px 9px; font-weight: 600; font-size: 11.5px;
+    text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
+  }
+  .classic-table tbody td {
+    padding: 6px 9px; border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  .classic-table tbody tr:nth-child(even) { background: var(--paper-2); }
+  .classic-table tbody tr:hover { background: rgba(110,139,92,0.12); }
+  .classic-table .ct-yard { font-weight: 600; color: var(--forest-2); font-size: 12px; white-space: nowrap; }
+  .classic-table .ct-name { font-family: "IBM Plex Sans", sans-serif; font-weight: 600; color: var(--ink); white-space: normal; min-width: 190px; letter-spacing: 0.1px; }
+  .name-trigger { cursor: pointer; }
+  .name-trigger:hover { text-decoration: underline; text-decoration-color: var(--amber); }
+  .classic-table .ct-sizes { white-space: normal; }
+
+  /* size chips: grouped 3-per-line, wrap to a new line (taller row) instead of
+     stretching the column, and the size value itself is highlighted */
+  .chip-line { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .chip-line:last-child { margin-bottom: 0; }
+  .size-chip {
+    display: inline-flex; align-items: baseline; gap: 4px; background: var(--paper-2);
+    border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px 4px 11px;
+    cursor: pointer; font-size: 12.5px; transition: background-color .1s ease, border-color .1s ease;
+    white-space: nowrap;
+  }
+  .size-chip:hover { border-color: var(--amber); background: rgba(180,131,47,0.16); }
+  .size-chip .chip-size-val { font-weight: 700; color: var(--amber-deep); }
+  .size-chip .chip-qty { color: var(--ink-soft); font-size: 11px; }
+  .size-chip .chip-cm { color: var(--danger); font-weight: 600; font-size: 10px; white-space: normal; }
+
+  /* ---- name context menu (click plant name: search on Google / copy) ---- */
+  .name-menu {
+    position: fixed; z-index: 200; background: var(--white); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: 0 10px 28px rgba(0,0,0,0.22); overflow: hidden; min-width: 190px;
+  }
+  .name-menu .nm-header {
+    padding: 8px 14px 6px; font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase;
+    letter-spacing: 0.3px; border-bottom: 1px solid var(--line); margin-bottom: 4px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 260px;
+  }
+  .name-menu button {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 10px 14px;
+    background: none; border: none; font-size: 13px; color: var(--ink); cursor: pointer; font-family: inherit;
+  }
+  .name-menu button:hover { background: var(--paper-2); }
+
+  /* ---- order / excel export ---- */
+  .order-btn {
+    white-space: nowrap; padding: 0 16px; border-radius: var(--radius);
+    border: 1px solid var(--amber-deep); background: var(--amber); color: #fff;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .order-btn:hover { background: var(--amber-deep); }
+  .order-status {
+    font-size: 12px; color: var(--ink-soft); white-space: nowrap; padding: 0 4px; align-self: center;
+  }
+  .add-order-btn {
+    display: block; width: 100%; margin: -6px 0 14px; padding: 10px; border-radius: var(--radius);
+    border: 1px solid var(--amber-deep); background: var(--amber); color: #fff; font-weight: 600;
+    font-family: inherit; font-size: 13.5px; cursor: pointer;
+  }
+  .add-order-btn:hover { background: var(--amber-deep); }
+  .add-order-btn:disabled {
+    background: var(--paper-2); border-color: var(--line); color: var(--ink-soft);
+    cursor: not-allowed; font-weight: 500;
+  }
+
+  /* ---- prompt/alert modal (reemplaza window.prompt/alert, que no funcionan dentro del artifact) ---- */
+  .prompt-overlay {
+    position: fixed; inset: 0; background: rgba(20,26,17,0.55); z-index: 300;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .prompt-panel {
+    background: var(--white); border-radius: 5px; max-width: 360px; width: 100%;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3); border-top: 4px solid var(--amber); padding: 18px 20px;
+  }
+  .prompt-title { font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .prompt-message { font-size: 13px; color: var(--ink-soft); margin-bottom: 12px; line-height: 1.4; }
+  .prompt-input {
+    width: 100%; padding: 9px 12px; border-radius: var(--radius); border: 1px solid var(--line);
+    font-family: inherit; font-size: 14px; margin-bottom: 14px; color: var(--ink); background: var(--white);
+  }
+  .prompt-input:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+  .prompt-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .prompt-actions button {
+    padding: 8px 16px; border-radius: var(--radius); font-family: inherit; font-size: 13px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--white); color: var(--ink);
+  }
+  .prompt-actions button.primary { background: var(--forest); border-color: var(--forest); color: #fff; font-weight: 600; }
+  .prompt-actions button.primary:hover { background: var(--forest-2); }
+
+  /* ---- plant details modal ---- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20,26,17,0.55); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-panel {
+    background: var(--white); border-radius: 5px; max-width: 420px; width: 100%;
+    max-height: 88vh; overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    border-top: 4px solid var(--amber);
+  }
+  .modal-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    padding: 16px 18px 10px;
+  }
+  .modal-close {
+    background: none; border: none; font-size: 20px; line-height: 1; color: var(--ink-soft);
+    cursor: pointer; padding: 2px 6px; border-radius: var(--radius);
+  }
+  .modal-close:hover { background: var(--paper-2); color: var(--ink); }
+  .modal-body { padding: 0 18px 20px; }
+  .modal-body .botanical { font-size: 19px; margin-bottom: 2px; }
+  .modal-body .category-line { margin-bottom: 12px; }
+  .modal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 14px; }
+  .modal-fields .mf-full { grid-column: 1 / -1; }
+  .modal-fields .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--ink-soft); margin-bottom: 2px; }
+  .modal-fields .val { font-size: 14px; color: var(--ink); font-weight: 500; }
+  .modal-price-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--paper-2); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px;
+  }
+  .modal-price-row .price { font-family: "Fraunces", serif; font-size: 22px; font-weight: 700; color: var(--amber-deep); }
+  .modal-price-row .qty { font-size: 13px; color: var(--ink-soft); }
+  .modal-price-row .qty strong { color: var(--ink); }
+  .modal-comment { display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--danger); margin-bottom: 12px; background: var(--danger-bg); padding: 4px 10px; border-radius: 20px; }
+  .modal-img-links { display: flex; gap: 8px; }
+  .modal-img-links a, .modal-img-links span {
+    flex: 1; text-align: center; font-size: 12.5px; padding: 9px 6px; border: 1px solid var(--line);
+    border-radius: var(--radius); text-decoration: none; color: var(--forest-2); background: var(--white); font-weight: 500;
+  }
+  .modal-img-links a:hover { border-color: var(--moss); background: rgba(110,139,92,0.10); }
+  .modal-img-links .disabled { color: var(--ink-soft); opacity: 0.4; }
+  .classic-table .ct-empty { color: var(--line); }
+
+  .result-summary {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin: 14px 0 16px; color: var(--ink-soft); font-size: 13px; flex-wrap: wrap; gap: 8px;
+  }
+  .result-summary strong { color: var(--ink); font-weight: 600; }
+
+  .active-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--danger-bg);
+    border: 1px solid var(--danger); color: var(--danger); padding: 3px 8px 3px 10px;
+    border-radius: 20px; font-size: 12px; font-weight: 500;
+  }
+  .chip button { background: none; border: none; cursor: pointer; color: var(--danger); font-size: 13px; padding: 0; line-height: 1; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-items: start; }
+
+  .plant-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow);
+  }
+  .group-card { border-color: var(--moss); }
+
+  .card-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 8px; }
+  .card-top .category-line { flex: 1; min-width: 80px; }
+  .yard-tag {
+    font-size: 10.5px; font-weight: 600; color: var(--forest-2);
+    background: rgba(110,139,92,0.14); padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+  }
+  .item-code { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .botanical { font-family: "Fraunces", serif; font-weight: 500; font-size: 16px; line-height: 1.28; color: var(--ink); }
+  .botanical .sizes-inline { font-family: "IBM Plex Sans", sans-serif; font-weight: 400; font-size: 12.5px; color: var(--ink-soft); }
+  .category-line { font-size: 12px; color: var(--ink-soft); }
+
+  /* line 3: size + qty + comment/status + dimensions + price, all in one row */
+  .line3 {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px;
+    font-size: 13px; color: var(--ink); padding-top: 7px; border-top: 1px dashed var(--line);
+  }
+  .line3 .seg::after { content: "·"; margin-left: 7px; color: var(--line); font-weight: 400; }
+  .line3 .seg:last-child::after { content: ""; margin: 0; }
+  .line3 .l3-size { font-weight: 600; }
+  .line3 .l3-comment { color: var(--danger); font-weight: 600; }
+  .line3 .l3-price { color: var(--amber-deep); font-weight: 700; margin-left: auto; font-family: "Fraunces", serif; font-size: 15px; }
+  .line3 .l3-price::after { content: ""; }
+
+  /* line 4: zone / sku / farm + image buttons */
+  .line4 {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px 10px; flex-wrap: wrap;
+  }
+  .line4-meta { font-size: 11.5px; color: var(--ink-soft); }
+  .img-links { display: flex; gap: 6px; }
+  .img-links a {
+    text-align: center; font-size: 11px; padding: 5px 9px; border: 1px solid var(--line);
+    border-radius: var(--radius); text-decoration: none; color: var(--forest-2); background: var(--white); white-space: nowrap;
+  }
+  .img-links a:hover { border-color: var(--moss); background: rgba(110,139,92,0.10); }
+  .img-links .disabled { color: var(--ink-soft); opacity: 0.4; cursor: default; pointer-events: none; }
+
+  .sizes-line { font-size: 12.5px; color: var(--ink-soft); margin-top: -2px; }
+  .sizes-line strong { color: var(--ink); font-weight: 600; }
+
+  .variant-list { display: flex; flex-direction: column; }
+  .variant-block { display: flex; flex-direction: column; gap: 6px; }
+  .variant-sep { border: none; border-top: 1px dashed var(--line); margin: 10px 0; }
+
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  .empty-state h2 { font-family: "Fraunces", serif; font-weight: 500; color: var(--ink); margin-bottom: 6px; font-size: 20px; }
+
+  .footer-note {
+    max-width: 1400px; margin: 0 auto; padding: 18px 24px 40px; font-size: 11.5px;
+    color: var(--ink-soft); border-top: 1px solid var(--line);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+
+  /* ---- tablet and mobile adaptation ---- */
+  @media (max-width: 900px) {
+    .order-panel { width: 260px; }
+    .top-inner { padding: 8px 16px; }
+    .filter-bar { padding: 10px 16px; }
+    main.results-full { padding: 12px 16px 50px; }
+  }
+  @media (max-width: 640px) {
+    .control-panel { z-index: 50; }
+    .top-inner { flex-wrap: nowrap; padding: 6px 12px; gap: 8px; min-height: 47px; }
+    .brand { font-size: 15px; min-width: 0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand .header-file { display: block; font-size: 10px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+    .brand .header-dot { display: none; }
+    .brand .header-updated { display: none; }
+    .header-yard { flex: 0 0 auto; gap: 4px; }
+    .header-yard label { display: none; }
+    .header-yard select { min-width: 0; width: min(39vw, 160px); max-width: 160px; font-size: 12px; padding: 6px 25px 6px 7px; }
+    .header-yard .refresh-link { font-size: 16px; padding: 3px; }
+    .filter-bar { padding: 6px 12px 7px; }
+    .filter-row { position: fixed; top: 0; right: 0; bottom: 0; z-index: 72; width: min(270px, 82vw); padding: max(18px, env(safe-area-inset-top)) 18px 18px; overflow-y: auto; display: block; background: var(--card); border-left: 1px solid var(--line); box-shadow: -5px 0 22px rgba(0,0,0,.18); transform: translateX(105%); transition: transform .2s ease; }
+    .filters-open .filter-row { transform: translateX(0); }
+    .filter-drawer-title { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 16px; margin-bottom: 18px; }
+    .filter-drawer-title button { background: none; border: 0; color: var(--ink); font-size: 23px; padding: 4px 8px; cursor: pointer; }
+    .filter-row-right { display: flex; flex-direction: column; width: 100%; gap: 15px; align-items: stretch; }
+    .filter-row-right .f-item select { width: 100%; min-width: 0; }
+    .filter-tab { display: flex; align-items: center; justify-content: center; position: fixed; right: 0; top: 48%; z-index: 54; width: 17px; height: 80px; padding: 0; border: 1px solid rgba(104,126,89,.30); border-right: 0; border-radius: 8px 0 0 8px; background: rgba(110,139,92,.30); color: var(--ink); font-size: 15px; cursor: pointer; backdrop-filter: blur(5px); }
+    .filters-open .filter-tab { display: none; }
+    .filter-backdrop { position: fixed; inset: 0; z-index: 71; background: rgba(0,0,0,.25); }
+    .filters-open .filter-backdrop { display: block; }
+    .google-search-row { border: 0; margin: 0; padding: 0; gap: 5px; }
+    .search-line { flex-direction: row; max-width: 100%; gap: 6px; }
+    .search-wrap-google { min-width: 0; }
+    .search-wrap-google input[type="search"] { padding: 8px 9px 8px 30px; font-size: 13px; }
+    .search-wrap-google svg { left: 10px; width: 14px; }
+    .size-filter-wrap { width: 76px; flex: 0 0 76px; }
+    .size-filter-wrap input { padding: 8px 7px; font-size: 12px; }
+    .google-btns-row { width: 100%; flex-wrap: nowrap; gap: 5px; }
+    .google-style-btn { flex: 1; min-width: 0; padding: 4px 3px; font-size: 10.5px; white-space: nowrap; }
+    .order-row { flex-wrap: nowrap; gap: 5px; margin-top: 5px; padding-top: 5px; }
+    .order-row-left { flex: 1; min-width: 0; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+    .order-btn { padding: 3px 7px; font-size: 11px; }
+    .order-status { display: none; }
+    .close-order-btn { padding: 3px 5px; font-size: 10px; }
+    .view-toggle { flex-shrink: 0; height: 27px; padding: 0 6px; font-size: 11px; }
+    main.results-full { padding: 6px 19px 50px 12px; }
+    .result-summary { margin: 6px 0 9px; }
+    .grid { grid-template-columns: 1fr; }
+    .order-panel { width: 84vw; }
+    .classic-table .ct-yard { font-size: 10px; white-space: normal; overflow-wrap: anywhere; }
+    .classic-table thead th, .classic-table tbody td { padding-left: 5px; padding-right: 5px; }
+    .classic-table .ct-name { min-width: 110px; }
+    .modal-panel { max-width: 92vw; }
+    .name-menu { max-width: 80vw; }
+  }
+  @media (max-width: 420px) {
+    .classic-table .ct-yard { font-size: 9.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="control-panel">
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">Everde
+        <span class="header-file" id="headerFile">Loading inventory…</span>
+        <span class="header-dot">·</span>
+        <span class="header-updated" id="headerUpdated"></span>
+      </div>
+      <div class="header-yard">
+        <button type="button" id="refreshBtn" class="refresh-link" aria-label="Refresh inventory" title="Refresh inventory">↻</button>
+        <label for="yardSelect">Yard</label>
+        <select id="yardSelect" aria-label="Yard"></select>
+      </div>
+    </div>
+  </header>
+
+  <div class="filter-bar">
+    <div class="filter-bar-inner">
+      <div class="filter-row" id="filterDrawer" role="group" aria-label="Additional filters">
+        <div class="filter-drawer-title">Filters <button type="button" id="closeFiltersBtn" aria-label="Close filters">×</button></div>
+        <div class="filter-row-right">
+          <div class="f-item">
+            <label for="categorySelect">Categ.</label>
+            <select id="categorySelect"><option value="">All</option></select>
+          </div>
+          <div class="f-item">
+            <label for="formSelect">Form</label>
+            <select id="formSelect"><option value="">All</option></select>
+          </div>
+          <div class="f-item">
+            <label for="regionSelect">Region</label>
+            <select id="regionSelect"><option value="">All</option></select>
+          </div>
+          <div class="f-item">
+            <label for="commentSelect">Comments</label>
+            <select id="commentSelect"><option value="">All</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- row 2: Google-style search box + size filter, with buttons below -->
+      <div class="google-search-row">
+        <div class="search-line">
+          <div class="search-wrap-google">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" id="searchInput" placeholder="Search by name, item code or SKU… (e.g. aza alas)" autocomplete="off">
+          </div>
+          <div class="size-filter-wrap">
+            <input type="text" id="sizeInput" list="sizeDatalist" placeholder="Size…" autocomplete="off">
+            <datalist id="sizeDatalist"></datalist>
+          </div>
+        </div>
+        <div class="google-btns-row">
+          <button class="google-style-btn" id="newSearchBtn">New search</button>
+          <button class="google-style-btn" id="googleSearchBtn">Search on Google</button>
+          <button class="google-style-btn reset-btn" id="resetBtnTop">Clear filters</button>
+        </div>
+      </div>
+
+      <!-- row 3: create order on the left, classic view on the right -->
+      <div class="order-row" id="orderRow">
+        <div class="order-row-left" id="orderRowLeft">
+          <button class="order-btn" id="createOrderBtn" type="button">🧾 Create order</button>
+          <span class="order-status" id="orderStatus">No active order</span>
+          <button class="close-order-btn" id="closeOrderBtn" type="button" style="display:none;">✕ Close order</button>
+        </div>
+        <label class="view-toggle" id="classicToggleWrap">
+          <input type="checkbox" id="classicToggle" checked>
+          <span>Classic view</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  <button type="button" class="filter-tab" id="filterTab" aria-label="Open filters" aria-controls="filterDrawer" aria-expanded="false" title="Filters">‹</button>
+  <div class="filter-backdrop" id="filterBackdrop"></div>
+</div>
+
+<main class="results-full">
+  <div class="result-summary" id="resultSummary">
+    <div><strong id="resultCount">0</strong> plants found <span id="varietyCount"></span></div>
+    <div class="active-chips" id="activeChips"></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="classic-wrap" id="classicWrap" style="display:none;">
+    <table class="classic-table" id="classicTable"></table>
+  </div>
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <h2>No plants found</h2>
+    <div>Try a different search term or remove some filters.</div>
+  </div>
+</main>
+
+<div class="order-panel" id="orderPanel" style="display:none;">
+  <div class="order-panel-header">
+    <div class="oph-title">🧾 <span id="opClientName"></span></div>
+    <button class="oph-close" id="orderPanelCollapse" type="button" title="Hide order" aria-label="Hide order">×</button>
+  </div>
+  <div class="order-panel-body" id="orderPanelBody"></div>
+  <div class="order-panel-footer">
+    <button class="export-order-btn" id="exportOrderBtn" type="button">📤 Export order</button>
+  </div>
+</div>
+<button type="button" class="order-tab" id="orderTab" aria-label="Open order" aria-controls="orderPanel" aria-expanded="false" title="Open order">‹</button>
+
+<div class="name-menu" id="nameMenu" style="display:none;"></div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-panel" id="modalPanel" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="prompt-overlay" id="promptOverlay" style="display:none;">
+  <div class="prompt-panel" id="promptPanel" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Sheets are discovered from the current workbook, never from a fixed list.
+  const YARD_ORDER = [];
+  let plants = [];
+
+  function normalizeHeader(value){
+    return String(value == null ? '' : value).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  const COLUMN_ALIASES = {
+    item: ['item','itemcode','itemnumber','code'],
+    botanical_name: ['botanicalname','botanical','plantname','name','description','plantdescription','botanicaldescription','botanicalcommonname','botanicalnamecommonname'],
+    size: ['size','containersize','pot size'],
+    form: ['form','plantform'],
+    saleable_qty: ['saleableqty','saleablequantity','available','availability','qtyavailable','quantityavailable','qty','quantity'],
+    price: ['price','unitprice','wholesaleprice'],
+    zone: ['zone','hardinesszone'],
+    comment: ['comment','comments','status','notes'],
+    specification: ['specification','specifications','spec','dimensions'],
+    category: ['category','plantcategory'],
+    upc: ['upc','upccode'], sku: ['sku','skunumber'],
+    farm: ['farm','farmcode'], region: ['region'],
+    plant_image: ['plantimage','plantimageurl','plantlink','plantphoto','plantphotourl','plantimagelink'],
+    crop_image: ['cropimage','cropimageurl','croplink','cropphoto','cropimagelink'],
+    caliper_image: ['caliperimage','caliperimageurl','caliperlink','caliperphoto','caliperimagelink']
+  };
+  const HEADERS = Object.fromEntries(Object.entries(COLUMN_ALIASES).map(function(entry){
+    return [entry[0], entry[1].map(normalizeHeader)];
+  }));
+  function headerMatches(field, value){
+    const h = normalizeHeader(value);
+    if(HEADERS[field].includes(h)) return true;
+    // Some yards append annotations to the column title, e.g. "Botanical Name (Latin)".
+    if(field === 'botanical_name') return /^(botanicalname|plantname|botanicaldescription|plantdescription)/.test(h);
+    if(field.endsWith('_image')) return h.includes(field.split('_')[0]) && /(image|photo|link)/.test(h);
+    return false;
+  }
+  function imageUrl(value, cell){
+    const link = cell && cell.l && cell.l.Target;
+    const formula = cell && cell.f;
+    const formulaLink = typeof formula === 'string' && /^HYPERLINK\s*\(/i.test(formula)
+      ? formula.match(/^HYPERLINK\s*\(\s*"((?:[^"]|"")+)"/i)?.[1]?.replace(/""/g, '"') : null;
+    for(const candidate of [link, formulaLink, value]){
+      if(typeof candidate === 'string' && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
+    }
+    return null;
+  }
+  function parseSheet(sheet, yard){
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null, raw:false, blankrows:true});
+    const bounds = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    let headerIndex = -1, bestScore = 0;
+    rows.slice(0, 30).forEach(function(row, index){
+      const fields = ['item','botanical_name','size','saleable_qty','category','price'];
+      const score = fields.reduce(function(total, field){
+        return total + (row.some(function(h){ return headerMatches(field,h); }) ? (field === 'botanical_name' ? 3 : 1) : 0);
+      }, 0);
+      if(score > bestScore){ bestScore = score; headerIndex = index; }
+    });
+    // Ignore cover/summary sheets; missing optional columns are fine.
+    if(bestScore < 2) return [];
+    const header = rows[headerIndex];
+    const columns = Object.fromEntries(Object.keys(HEADERS).map(function(field){
+      return [field, header.findIndex(function(h){ return headerMatches(field,h); })];
+    }));
+    // On split headers the name may be on the adjacent row, while item/size are above.
+    if(columns.botanical_name < 0){
+      for(const nearby of [headerIndex - 1, headerIndex + 1]){
+        if(nearby < 0 || nearby >= rows.length) continue;
+        const index = rows[nearby].findIndex(function(h){ return headerMatches('botanical_name',h); });
+        if(index >= 0){ columns.botanical_name = index; break; }
+      }
+    }
+    {
+      // A merged or shifted heading may point at an empty column. Compare the
+      // actual rows before choosing a different unmapped text column.
+      const used = new Set(Object.keys(columns).filter(function(field){ return field !== 'botanical_name' && columns[field] >= 0; }).map(function(field){ return columns[field]; }));
+      let bestColumn = -1, bestCount = 0;
+      const sample = rows.slice(headerIndex + 1, headerIndex + 16);
+      const nameCount = sample.filter(function(row){
+        const text = String(row[columns.botanical_name] == null ? '' : row[columns.botanical_name]).trim();
+        return text.length >= 8 && /[a-z]{3,}\s+[a-z]{3,}/i.test(text);
+      }).length;
+      const width = Math.max(...rows.slice(headerIndex, headerIndex + 6).map(function(row){ return row.length; }), 0);
+      for(let col = 0; col < width; col++){
+        if(used.has(col) || col === columns.botanical_name) continue;
+        const count = rows.slice(headerIndex + 1, headerIndex + 11).filter(function(row){
+          const text = String(row[col] == null ? '' : row[col]).trim();
+          return text.length >= 8 && /[a-z]{3,}\s+[a-z]{3,}/i.test(text) && !/^https?:/i.test(text);
+        }).length;
+        if(count > bestCount){ bestCount = count; bestColumn = col; }
+      }
+      if(bestCount >= 2 && bestCount > nameCount * 2) columns.botanical_name = bestColumn;
+    }
+    return rows.slice(headerIndex + 1).map(function(row, offset){
+      const plant = {yard:yard};
+      Object.keys(columns).forEach(function(field){
+        const index = columns[field];
+        const value = index < 0 ? null : row[index];
+        if(field.endsWith('_image')){
+          const address = index < 0 ? null : XLSX.utils.encode_cell({r:bounds.s.r + headerIndex + 1 + offset, c:bounds.s.c + index});
+          plant[field] = imageUrl(value, address && sheet[address]);
+        } else {
+          plant[field] = value == null || String(value).trim() === '' ? null : String(value).trim();
+        }
+      });
+      // Some sheets place linked pictures in columns with no recognizable heading.
+      for(let index = 0; index < row.length; index++){
+        const address = XLSX.utils.encode_cell({r:bounds.s.r + headerIndex + 1 + offset, c:bounds.s.c + index});
+        const url = imageUrl(row[index], sheet[address]);
+        if(!url) continue;
+        const kind = /(?:_|\b)CALIPER(?:\.|_|\b)/i.test(url) ? 'caliper_image'
+          : /(?:_|\b)CROP(?:\.|_|\b)/i.test(url) ? 'crop_image'
+          : /(?:_|\b)PLANT(?:\.|_|\b)/i.test(url) ? 'plant_image' : null;
+        if(kind && !plant[kind]) plant[kind] = url;
+      }
+      ['saleable_qty','price','zone'].forEach(function(field){
+        if(plant[field] != null){
+          const number = Number(plant[field].replace(/[$,]/g,''));
+          plant[field] = Number.isFinite(number) ? number : null;
+        }
+      });
+      return plant;
+    }).filter(function(plant){
+      if(!plant.item && !plant.botanical_name) return false;
+      return !headerMatches('botanical_name', plant.botanical_name) && !headerMatches('item', plant.item);
+    });
+  }
+  function loadWorkbook(buffer){
+    if(typeof XLSX === 'undefined') throw new Error('The Excel library could not be loaded.');
+    const workbook = XLSX.read(buffer, {type:'array'});
+    const nextPlants = [], nextYards = [];
+    workbook.SheetNames.forEach(function(yard){
+      const rows = parseSheet(workbook.Sheets[yard], yard);
+      if(rows.length){ nextYards.push(yard); nextPlants.push.apply(nextPlants, rows); }
+    });
+    if(!nextPlants.length) throw new Error('No plant rows were found. Check the column names in the Excel workbook.');
+    plants = nextPlants;
+    YARD_ORDER.splice(0, YARD_ORDER.length, ...nextYards);
+  }
+  async function latestWorkbook(){
+    // A GitHub Pages project is normally OWNER.github.io/REPOSITORY/.
+    const host = location.hostname.toLowerCase();
+    const owner = host.endsWith('.github.io') ? host.slice(0, -'.github.io'.length) : 'stockplant';
+    const parts = location.pathname.split('/').filter(Boolean);
+    const repo = host.endsWith('.github.io')
+      ? (parts[0] && !/\.html?$/i.test(parts[0]) ? parts[0] : owner + '.github.io')
+      : 'inventory';
+    const api = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
+    const response = await fetch(api + '/contents?ts=' + Date.now(), {cache:'no-store'});
+    if(!response.ok) throw new Error('Could not list the Excel files (HTTP ' + response.status + ').');
+    const files = (await response.json()).filter(function(file){
+      return file.type === 'file' && /\.(xlsx?|xlsm)$/i.test(file.name) && !file.name.startsWith('~$');
+    });
+    if(!files.length) throw new Error('No Excel file was found in the repository root.');
+    // File commits give the true last update even when filenames have no date.
+    const candidates = await Promise.all(files.map(async function(file){
+      const res = await fetch(api + '/commits?path=' + encodeURIComponent(file.path) + '&per_page=1&ts=' + Date.now(), {cache:'no-store'});
+      if(!res.ok) throw new Error('Could not check the update date for ' + file.name + ' (HTTP ' + res.status + ').');
+      const commits = await res.json();
+      return {file:file, updated:Date.parse(commits[0]?.commit?.committer?.date || '') || 0};
+    }));
+    candidates.sort(function(a,b){ return b.updated - a.updated || a.file.name.localeCompare(b.file.name); });
+    return candidates[0];
+  }
+  async function reloadInventory(){
+    const fileLabel = document.getElementById('headerFile');
+    const updatedLabel = document.getElementById('headerUpdated');
+    fileLabel.textContent = 'Loading inventory…';
+    try {
+      const latest = await latestWorkbook();
+      const url = latest.file.download_url;
+      if(!url) throw new Error('No download link was provided for the Excel file.');
+      const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'ts=' + Date.now(), {cache:'no-store'});
+      if(!response.ok) throw new Error('Could not download ' + latest.file.name + ' (HTTP ' + response.status + ').');
+      loadWorkbook(await response.arrayBuffer());
+      fileLabel.textContent = latest.file.name;
+      updatedLabel.textContent = latest.updated ? 'Last updated: ' + new Date(latest.updated).toLocaleDateString() : '';
+      state.yard = state.category = state.form = state.region = state.comment = state.sizeQuery = state.query = '';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('sizeInput').value = '';
+      populateFilters();
+      render();
+    } catch(error){
+      fileLabel.textContent = 'Inventory unavailable';
+      updatedLabel.textContent = error.message;
+      showAlert(error.message);
+    }
+  }
+
+  const state = { query: "", yard: "", category: "", form: "", region: "", comment: "", sizeQuery: "", classic: true };
+  const variantRegistry = [];
+
+  function uniqueSorted(field){
+    const set = new Set();
+    plants.forEach(function(p){ if(p[field]) set.add(p[field]); });
+    return Array.from(set).sort();
+  }
+
+  function fillSelect(id, values, formatter){
+    const sel = document.getElementById(id);
+    const fmt = formatter || titleCase;
+    values.forEach(function(v){
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = fmt(v);
+      sel.appendChild(opt);
+    });
+  }
+
+  function titleCase(s){
+    if(!s) return s;
+    return String(s).toLowerCase().replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  // Sentence case: only the first letter of the whole string is uppercase.
+  function sentenceCase(s){
+    if(!s) return s;
+    var lower = String(s).toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
+
+  function buildYardSelect(){
+    const sel = document.getElementById('yardSelect');
+    sel.innerHTML = "";
+    const optAll = document.createElement('option');
+    optAll.value = "";
+    optAll.textContent = 'All yards (' + plants.length + ')';
+    sel.appendChild(optAll);
+    YARD_ORDER.forEach(function(yard){
+      const count = plants.filter(function(p){ return p.yard === yard; }).length;
+      const opt = document.createElement('option');
+      opt.value = yard;
+      opt.textContent = titleCase(yard) + ' (' + count + ')';
+      sel.appendChild(opt);
+    });
+  }
+
+  // ---- flexible, order-independent, progressive token search ----
+  function matches(p){
+    if(state.yard && p.yard !== state.yard) return false;
+    if(state.category && p.category !== state.category) return false;
+    if(state.form && p.form !== state.form) return false;
+    if(state.region && p.region !== state.region) return false;
+    if(state.comment && p.comment !== state.comment) return false;
+    if(state.sizeQuery && !(String(p.size || '').toLowerCase().indexOf(state.sizeQuery.toLowerCase()) !== -1)) return false;
+    if(state.query){
+      const tokens = state.query.toLowerCase().split(/\s+/).filter(Boolean);
+      const hay = [p.item, p.botanical_name, p.sku, p.upc, p.specification, p.category].filter(Boolean).join(' ').toLowerCase();
+      for(var i=0; i<tokens.length; i++){
+        if(hay.indexOf(tokens[i]) === -1) return false;
+      }
+    }
+    return true;
+  }
+
+  function sortFn(a, b){
+    return (a.botanical_name||'').localeCompare(b.botanical_name||'');
+  }
+
+  // Extracts the leading numeric magnitude from a size string ("#010" -> 10,
+  // "024 Inch Box" -> 24) so sizes always sort smallest to largest.
+  function sizeNum(s){
+    if(!s) return 999999;
+    const m = String(s).match(/\d+/);
+    return m ? parseInt(m[0], 10) : 999999;
+  }
+  function sortBySize(a, b){
+    return sizeNum(a.size) - sizeNum(b.size);
+  }
+  function sortByYardThenSize(a, b){
+    const ya = YARD_ORDER.indexOf(a.yard), yb = YARD_ORDER.indexOf(b.yard);
+    if(ya !== yb) return ya - yb;
+    return sizeNum(a.size) - sizeNum(b.size);
+  }
+
+  function fmtMoney(n){
+    if(n === null || n === undefined || n === '') return '—';
+    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  // Builds line 3: size · quantity · comment/status · dimensions · price
+  function line3Html(p){
+    var segs = [];
+    segs.push('<span class="seg l3-size">' + escapeHtml(p.size || '—') + '</span>');
+    segs.push('<span class="seg">' + (p.saleable_qty != null ? p.saleable_qty : 0) + ' available</span>');
+    if(p.comment) segs.push('<span class="seg l3-comment">' + escapeHtml(p.comment) + '</span>');
+    if(p.specification) segs.push('<span class="seg">' + escapeHtml(p.specification) + '</span>');
+    return '<div class="line3">' + segs.join('') + '<span class="l3-price">' + fmtMoney(p.price) + '</span></div>';
+  }
+
+  // Builds line 4: zone, sku, farm + image buttons
+  function line4Html(p){
+    var meta = [];
+    if(p.zone != null) meta.push('Zone ' + escapeHtml(p.zone));
+    meta.push('SKU ' + escapeHtml(p.sku || '—'));
+    meta.push('Farm ' + escapeHtml(p.farm || '—'));
+    var metaHtml = '<span class="line4-meta">' + meta.join(' · ') + '</span>';
+    var linksHtml = '<div class="img-links">' + imgLink(p.plant_image, 'Plant') + imgLink(p.crop_image, 'Crop') + imgLink(p.caliper_image, 'Caliper') + '</div>';
+    return '<div class="line4">' + metaHtml + linksHtml + '</div>';
+  }
+
+  function escapeHtml(s){
+    if(s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function imgLink(url, label){
+    if(url) return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + label + '</a>';
+    return '<span class="disabled">' + label + '</span>';
+  }
+  function miniImgLink(url, letter, title){
+    if(url) return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" title="' + title + '">' + letter + '</a>';
+    return '<span class="disabled" title="No ' + title + ' image">' + letter + '</span>';
+  }
+
+  // ---- single-size card: 4 compact lines ----
+  function singleCardHtml(p){
+    var parts = [];
+    parts.push('<div class="plant-card">');
+    // line 1: yard + category + item code
+    parts.push('<div class="card-top"><span class="yard-tag">' + escapeHtml(titleCase(p.yard)) + '</span><span class="category-line">' + escapeHtml(titleCase(p.category)) + (p.form ? ' · ' + escapeHtml(titleCase(p.form)) : '') + '</span><span class="item-code">' + escapeHtml(p.item) + '</span></div>');
+    // line 2: plant name
+    parts.push('<div class="botanical"><span class="name-trigger" data-plant-name="' + escapeHtml(p.botanical_name || '') + '">' + escapeHtml(p.botanical_name || 'No name') + '</span></div>');
+    // line 3: size + quantity + comment/status + dimensions + price
+    parts.push(line3Html(p));
+    // line 4: zone, sku, farm + image buttons
+    parts.push(line4Html(p));
+    parts.push('</div>');
+    return parts.join('');
+  }
+
+  // ---- grouped card: yard+category, name(sizes), then each variant in 2 lines ----
+  function groupCardHtml(itemsIn){
+    const items = itemsIn.slice().sort(sortBySize);
+    const first = items[0];
+    const forms = new Set(items.map(function(p){ return p.form || ''; }));
+    const sharedForm = forms.size === 1 ? Array.from(forms)[0] : '';
+    const sizesList = items.map(function(p){ return p.size || '—'; }).join(', ');
+
+    var parts = [];
+    parts.push('<div class="plant-card group-card">');
+    // line 1: yard + category
+    parts.push('<div class="card-top"><span class="yard-tag">' + escapeHtml(titleCase(first.yard)) + '</span><span class="category-line">' + escapeHtml(titleCase(first.category)) + (sharedForm ? ' · ' + escapeHtml(titleCase(sharedForm)) : '') + '</span></div>');
+    // line 2: plant name (available sizes)
+    parts.push('<div class="botanical"><span class="name-trigger" data-plant-name="' + escapeHtml(first.botanical_name || '') + '">' + escapeHtml(first.botanical_name || 'No name') + '</span> <span class="sizes-inline">(' + escapeHtml(sizesList) + ')</span></div>');
+
+    parts.push('<div class="variant-list">');
+    items.forEach(function(p, idx){
+      if(idx > 0) parts.push('<hr class="variant-sep">');
+      parts.push('<div class="variant-block">');
+      parts.push(line3Html(p));
+      parts.push(line4Html(p));
+      parts.push('</div>');
+    });
+    parts.push('</div>');
+    parts.push('</div>');
+    return parts.join('');
+  }
+
+  function groupForDisplay(list){
+    const map = new Map();
+    const order = [];
+    list.forEach(function(p){
+      const key = p.yard + '|' + (p.botanical_name || '').trim().toUpperCase();
+      if(!map.has(key)){ map.set(key, []); order.push(key); }
+      map.get(key).push(p);
+    });
+    return order.map(function(k){ return map.get(k); });
+  }
+
+  function chipHtml(label, key){
+    return '<span class="chip">' + escapeHtml(label) + '<button data-clear="' + key + '" aria-label="Remove filter">×</button></span>';
+  }
+
+  function buildChips(){
+    const chips = [];
+    if(state.yard) chips.push(chipHtml('Yard: ' + titleCase(state.yard), 'yard'));
+    if(state.category) chips.push(chipHtml('Category: ' + titleCase(state.category), 'category'));
+    if(state.form) chips.push(chipHtml('Form: ' + titleCase(state.form), 'form'));
+    if(state.region) chips.push(chipHtml('Region: ' + state.region, 'region'));
+    if(state.comment) chips.push(chipHtml('Comment: ' + state.comment, 'comment'));
+    if(state.sizeQuery) chips.push(chipHtml('Size: ' + state.sizeQuery, 'sizeQuery'));
+    if(state.query) chips.push(chipHtml('"' + state.query + '"', 'query'));
+    const container = document.getElementById('activeChips');
+    container.innerHTML = chips.join('');
+    container.querySelectorAll('button[data-clear]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        const key = btn.getAttribute('data-clear');
+        if(key === 'query'){ state.query = ""; document.getElementById('searchInput').value = ""; }
+        else if(key === 'sizeQuery'){ state.sizeQuery = ""; document.getElementById('sizeInput').value = ""; }
+        else state[key] = "";
+        syncControls();
+        render();
+      });
+    });
+  }
+
+  function syncControls(){
+    ['yard','category','form','region','comment'].forEach(function(key){
+      const sel = document.getElementById(key + 'Select');
+      sel.value = state[key];
+      sel.classList.toggle('filter-active', !!state[key]);
+    });
+    document.getElementById('searchInput').classList.toggle('filter-active', !!state.query);
+    document.getElementById('sizeInput').classList.toggle('filter-active', !!state.sizeQuery);
+    const anyActive = !!(state.query || state.yard || state.category || state.form || state.region || state.comment || state.sizeQuery);
+    document.getElementById('resetBtnTop').classList.toggle('filter-active', anyActive);
+  }
+
+  const PLUS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+  function classicTableHtml(groups){
+    variantRegistry.length = 0;
+    var head = '<thead><tr><th>Yard</th><th>Plant name</th><th>Sizes</th></tr></thead>';
+
+    var rows = groups.map(function(g){
+      const items = g.slice().sort(sortBySize);
+      const first = items[0];
+      var cells = '<td class="ct-yard">' + escapeHtml(titleCase(first.yard)) + '</td>';
+      cells += '<td class="ct-name"><span class="name-trigger" data-plant-name="' + escapeHtml(first.botanical_name || '') + '">' + escapeHtml(sentenceCase(first.botanical_name) || 'No name') + '</span></td>';
+
+      var chipsHtml = '';
+      for(var i = 0; i < items.length; i += 3){
+        var chunk = items.slice(i, i + 3);
+        chipsHtml += '<div class="chip-line">' + chunk.map(function(p){
+          const idx = variantRegistry.push(p) - 1;
+          return '<span class="size-chip" data-idx="' + idx + '" title="View plant details">' +
+            '<span class="chip-size-val">' + escapeHtml(p.size || '—') + '</span>' +
+            '<span class="chip-qty">(' + (p.saleable_qty != null ? p.saleable_qty : 0) + ')</span>' +
+            (p.comment ? '<span class="chip-cm">' + escapeHtml(p.comment) + '</span>' : '') +
+            (currentOrder ? '<button type="button" class="quick-add-btn" data-idx="' + idx + '" title="Quick-add to order">' + PLUS_SVG + '</button>' : '') +
+            '</span>';
+        }).join('') + '</div>';
+      }
+      cells += '<td class="ct-sizes">' + chipsHtml + '</td>';
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+
+    return head + '<tbody>' + rows + '</tbody>';
+  }
+
+  // ---- plant details modal (full record, same fields as the card view) ----
+  function fichaTecnicaHtml(p){
+    var parts = [];
+    parts.push('<div class="modal-head">');
+    parts.push('<div><span class="yard-tag">' + escapeHtml(titleCase(p.yard)) + '</span></div>');
+    parts.push('<button class="modal-close" id="modalCloseBtn" aria-label="Close">×</button>');
+    parts.push('</div>');
+    parts.push('<div class="modal-body">');
+    parts.push('<div class="botanical">' + escapeHtml(p.botanical_name || 'No name') + '</div>');
+    parts.push('<div class="category-line">' + escapeHtml(titleCase(p.category)) + (p.form ? ' · ' + escapeHtml(titleCase(p.form)) : '') + '</div>');
+
+    parts.push('<div class="modal-fields">');
+    parts.push('<div><div class="label">Item code</div><div class="val">' + escapeHtml(p.item || '—') + '</div></div>');
+    parts.push('<div><div class="label">Size</div><div class="val">' + escapeHtml(p.size || '—') + '</div></div>');
+    parts.push('<div><div class="label">Zone</div><div class="val">' + escapeHtml(p.zone != null ? p.zone : '—') + '</div></div>');
+    parts.push('<div><div class="label">SKU</div><div class="val">' + escapeHtml(p.sku || '—') + '</div></div>');
+    parts.push('<div><div class="label">Farm</div><div class="val">' + escapeHtml(p.farm || '—') + '</div></div>');
+    parts.push('<div><div class="label">Region</div><div class="val">' + escapeHtml(p.region || '—') + '</div></div>');
+    parts.push('<div><div class="label">UPC</div><div class="val">' + escapeHtml(p.upc || '—') + '</div></div>');
+    if(p.specification){
+      parts.push('<div class="mf-full"><div class="label">Dimensions (width x height)</div><div class="val">' + escapeHtml(p.specification) + '</div></div>');
+    }
+    parts.push('</div>');
+
+    parts.push('<div class="modal-price-row"><span class="price">' + fmtMoney(p.price) + '</span><span class="qty"><strong>' + (p.saleable_qty != null ? p.saleable_qty : 0) + '</strong> available</span></div>');
+    if(currentOrder){
+      parts.push('<button class="add-order-btn" id="addOrderBtn" type="button">➕ Add to ' + escapeHtml(currentOrder.clientName) + '\'s order</button>');
+    } else {
+      parts.push('<button class="add-order-btn" id="addOrderBtn" type="button" disabled title="Create an order first with the &quot;Create order&quot; button">➕ Add to order (create an order first)</button>');
+    }
+    if(p.comment) parts.push('<div class="modal-comment">' + escapeHtml(p.comment) + '</div>');
+    parts.push('<div class="modal-img-links">' + imgLink(p.plant_image, 'Plant') + imgLink(p.crop_image, 'Crop') + imgLink(p.caliper_image, 'Caliper') + '</div>');
+    parts.push('</div>');
+    return parts.join('');
+  }
+
+  var currentModalRecord = null;
+
+  function openModal(p){
+    currentModalRecord = p;
+    document.getElementById('modalPanel').innerHTML = fichaTecnicaHtml(p);
+    document.getElementById('modalOverlay').style.display = 'flex';
+    document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+    const addBtn = document.getElementById('addOrderBtn');
+    if(!addBtn.disabled){
+      addBtn.addEventListener('click', function(){ addToOrder(currentModalRecord); });
+    }
+  }
+  function closeModal(){
+    document.getElementById('modalOverlay').style.display = 'none';
+  }
+  document.getElementById('modalOverlay').addEventListener('click', function(e){
+    if(e.target.id === 'modalOverlay') closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeModal(); closeNameMenu(); }
+  });
+
+  // ---- our own prompt/alert modals: the artifact sandbox blocks native browser dialogs ----
+  function showPrompt(title, message, defaultValue, onConfirm){
+    const overlay = document.getElementById('promptOverlay');
+    const panel = document.getElementById('promptPanel');
+    panel.innerHTML =
+      '<div class="prompt-title">' + escapeHtml(title) + '</div>' +
+      (message ? '<div class="prompt-message">' + escapeHtml(message) + '</div>' : '') +
+      '<input type="text" id="promptInput" class="prompt-input" value="' + escapeHtml(defaultValue || '') + '">' +
+      '<div class="prompt-actions"><button type="button" id="promptCancel">Cancel</button><button type="button" id="promptOk" class="primary">OK</button></div>';
+    overlay.style.display = 'flex';
+    const input = document.getElementById('promptInput');
+    input.focus(); input.select();
+    function close(){ overlay.style.display = 'none'; }
+    document.getElementById('promptCancel').addEventListener('click', close);
+    document.getElementById('promptOk').addEventListener('click', function(){ const v = input.value; close(); onConfirm(v); });
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ const v = input.value; close(); onConfirm(v); }
+      if(e.key === 'Escape'){ close(); }
+    });
+  }
+  function showAlert(message){
+    const overlay = document.getElementById('promptOverlay');
+    const panel = document.getElementById('promptPanel');
+    panel.innerHTML =
+      '<div class="prompt-title">Notice</div>' +
+      '<div class="prompt-message">' + escapeHtml(message) + '</div>' +
+      '<div class="prompt-actions"><button type="button" id="promptOk" class="primary">OK</button></div>';
+    overlay.style.display = 'flex';
+    document.getElementById('promptOk').addEventListener('click', function(){ overlay.style.display = 'none'; });
+  }
+  function showConfirm(title, message, onConfirm){
+    const overlay = document.getElementById('promptOverlay');
+    const panel = document.getElementById('promptPanel');
+    panel.innerHTML =
+      '<div class="prompt-title">' + escapeHtml(title) + '</div>' +
+      '<div class="prompt-message">' + escapeHtml(message) + '</div>' +
+      '<div class="prompt-actions"><button type="button" id="promptCancel">Cancel</button><button type="button" id="promptOk" class="primary">Continue</button></div>';
+    overlay.style.display = 'flex';
+    function close(){ overlay.style.display = 'none'; }
+    document.getElementById('promptCancel').addEventListener('click', close);
+    document.getElementById('promptOk').addEventListener('click', function(){ close(); onConfirm(); });
+  }
+  // modal with several choice buttons (e.g. Excel/PDF, or Save/Discard)
+  function showChoice(title, message, options, onChoose){
+    const overlay = document.getElementById('promptOverlay');
+    const panel = document.getElementById('promptPanel');
+    panel.innerHTML =
+      '<div class="prompt-title">' + escapeHtml(title) + '</div>' +
+      (message ? '<div class="prompt-message">' + escapeHtml(message) + '</div>' : '') +
+      '<div class="prompt-actions">' + options.map(function(o, i){
+        return '<button type="button" class="' + (i === options.length - 1 ? 'primary' : '') + '" data-choice-val="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</button>';
+      }).join('') + '</div>';
+    overlay.style.display = 'flex';
+    panel.querySelectorAll('[data-choice-val]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        overlay.style.display = 'none';
+        onChoose(btn.getAttribute('data-choice-val'));
+      });
+    });
+  }
+  document.getElementById('promptOverlay').addEventListener('click', function(e){
+    if(e.target.id === 'promptOverlay') e.currentTarget.style.display = 'none';
+  });
+
+  // ---- purchase orders: built in memory, shown in the side panel,
+  // and exported on demand to Excel (SheetJS) or PDF (jsPDF) ----
+  var currentOrder = null;
+
+  function updateOrderStatus(){
+    const el = document.getElementById('orderStatus');
+    if(!currentOrder){ el.textContent = 'No active order'; return; }
+    el.textContent = 'Order: ' + currentOrder.clientName + ' (' + currentOrder.items.length + (currentOrder.items.length === 1 ? ' line' : ' lines') + ')';
+  }
+
+  function sanitizeFileName(name){
+    return (name || 'client').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_') || 'client';
+  }
+
+  function buildOrderWorkbook(order){
+    const rows = [];
+    rows.push(['PURCHASE ORDER — Client: ' + order.clientName]);
+    rows.push(['Date: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })]);
+    rows.push([]);
+    rows.push(['Qty','Yard','Item code','Botanical name','Size','Form','Price','Zone','Comment','Specification','Category','SKU','Farm','Region']);
+    order.items.forEach(function(it){
+      rows.push([
+        it.qty, titleCase(it.yard), it.item || '', it.botanical_name || '', it.size || '',
+        it.form ? titleCase(it.form) : '', it.price != null ? it.price : '', it.zone != null ? it.zone : '',
+        it.comment || '', it.specification || '', it.category ? titleCase(it.category) : '',
+        it.sku || '', it.farm || '', it.region || ''
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [ {wch:9},{wch:14},{wch:16},{wch:32},{wch:10},{wch:14},{wch:9},{wch:6},{wch:16},{wch:20},{wch:16},{wch:10},{wch:8},{wch:8} ];
+    ws['!merges'] = [ { s:{r:0,c:0}, e:{r:0,c:13} }, { s:{r:1,c:0}, e:{r:1,c:13} } ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Order');
+    return wb;
+  }
+
+  function downloadOrderXlsx(){
+    if(!currentOrder) return;
+    try {
+      if(typeof XLSX === 'undefined'){ showAlert('Could not load the Excel library. Check your connection and try again.'); return; }
+      const wb = buildOrderWorkbook(currentOrder);
+      XLSX.writeFile(wb, 'Order_' + sanitizeFileName(currentOrder.clientName) + '.xlsx');
+    } catch(err){
+      showAlert('Could not generate the Excel file: ' + err.message);
+    }
+  }
+
+  function downloadOrderPdf(){
+    if(!currentOrder) return;
+    try {
+      if(typeof window.jspdf === 'undefined'){ showAlert('Could not load the PDF library. Check your connection and try again.'); return; }
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+      let y = 15;
+      doc.setFontSize(14);
+      doc.text('Purchase order — Client: ' + currentOrder.clientName, 14, y); y += 7;
+      doc.setFontSize(9);
+      doc.text('Date: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), 14, y); y += 8;
+
+      const cols = [
+        { h:'Qty', x:14 }, { h:'Yard', x:26 }, { h:'Code', x:48 }, { h:'Botanical name', x:76 },
+        { h:'Size', x:150 }, { h:'Price', x:172 }, { h:'SKU', x:192 }, { h:'Farm', x:216 }, { h:'Comment', x:238 }
+      ];
+      doc.setFontSize(9); doc.setFont(undefined, 'bold');
+      cols.forEach(function(c){ doc.text(c.h, c.x, y); });
+      y += 2; doc.setLineWidth(0.2); doc.line(14, y, 282, y); y += 5;
+      doc.setFont(undefined, 'normal');
+
+      currentOrder.items.forEach(function(it){
+        if(y > 195){ doc.addPage(); y = 15; }
+        const vals = [
+          String(it.qty), titleCase(it.yard), it.item || '', (it.botanical_name || '').slice(0, 38),
+          it.size || '', it.price != null ? ('$' + it.price) : '', it.sku || '', it.farm || '', it.comment || ''
+        ];
+        vals.forEach(function(v, i){ doc.text(String(v), cols[i].x, y); });
+        y += 6;
+      });
+
+      doc.save('Order_' + sanitizeFileName(currentOrder.clientName) + '.pdf');
+    } catch(err){
+      showAlert('Could not generate the PDF: ' + err.message);
+    }
+  }
+
+  function exportOrderFlow(afterExport){
+    if(!currentOrder || currentOrder.items.length === 0){
+      showAlert('The order doesn\'t have any plants added yet.');
+      return;
+    }
+    showChoice('Export order', 'Which format would you like to export ' + currentOrder.clientName + '\'s order in?', [
+      { label: 'Excel (.xlsx)', value: 'xlsx' },
+      { label: 'PDF', value: 'pdf' }
+    ], function(fmt){
+      if(fmt === 'xlsx') downloadOrderXlsx(); else downloadOrderPdf();
+      if(afterExport) afterExport();
+    });
+  }
+
+  function createOrder(){
+    showPrompt('Create order', 'Client name for the new order:', '', function(name){
+      if(!name || !name.trim()) return;
+      currentOrder = { clientName: name.trim(), items: [] };
+      document.getElementById('orderPanel').classList.remove('collapsed');
+      updateOrderStatus();
+      updateOrderButtons();
+      renderOrderPanel();
+      render();
+    });
+  }
+
+  function closeOrder(){
+    if(!currentOrder) return;
+    showChoice(
+      'Close order',
+      'Do you want to save (export) "' + currentOrder.clientName + '"\'s order before closing it, or discard it without saving?',
+      [ { label: 'Discard without saving', value: 'discard' }, { label: 'Save and close', value: 'save' } ],
+      function(choice){
+        if(choice === 'save'){
+          exportOrderFlow(finalizeCloseOrder);
+        } else {
+          finalizeCloseOrder();
+        }
+      }
+    );
+  }
+
+  function finalizeCloseOrder(){
+    currentOrder = null;
+    updateOrderStatus();
+    updateOrderButtons();
+    renderOrderPanel();
+    render();
+  }
+
+  function updateOrderButtons(){
+    const createBtn = document.getElementById('createOrderBtn');
+    const closeBtn = document.getElementById('closeOrderBtn');
+    createBtn.disabled = !!currentOrder;
+    closeBtn.style.display = currentOrder ? 'inline-block' : 'none';
+  }
+
+  // ---- side panel: lists what's been added, grouped by yard ----
+  function renderOrderPanel(){
+    const panel = document.getElementById('orderPanel');
+    const tab = document.getElementById('orderTab');
+    if(!currentOrder || !state.classic){
+      panel.style.display = 'none';
+      tab.classList.remove('visible');
+      return;
+    }
+    panel.style.display = 'flex';
+    tab.classList.toggle('visible', panel.classList.contains('collapsed'));
+    tab.setAttribute('aria-expanded', String(!panel.classList.contains('collapsed')));
+    document.getElementById('opClientName').textContent = currentOrder.clientName;
+
+    const body = document.getElementById('orderPanelBody');
+    if(currentOrder.items.length === 0){
+      body.innerHTML = '<div class="op-empty">You haven\'t added any plants yet. Use the "+" button on a size, or "Add to order" in the plant details.</div>';
+      return;
+    }
+
+    // groups consecutively by yard: adding a plant from a different yard
+    // starts a new block instead of mixing with the previous one
+    const blocks = [];
+    currentOrder.items.forEach(function(it, idx){
+      const last = blocks[blocks.length - 1];
+      if(last && last.yard === it.yard){
+        last.items.push({ it: it, idx: idx });
+      } else {
+        blocks.push({ yard: it.yard, items: [{ it: it, idx: idx }] });
+      }
+    });
+
+    body.innerHTML = blocks.map(function(block){
+      var rows = block.items.map(function(entry){
+        const it = entry.it;
+        return '<div class="op-row">' +
+          '<span class="op-size">' + escapeHtml(it.size || '—') + '</span>' +
+          '<span class="op-name">' + escapeHtml(sentenceCase(it.botanical_name) || 'No name') + '</span>' +
+          '<span class="op-qty">×' + it.qty + '</span>' +
+          '<button type="button" class="op-remove" data-remove-idx="' + entry.idx + '" title="Remove">✕</button>' +
+          '</div>';
+      }).join('');
+      return '<div class="op-yard-group"><div class="op-yard-label">' + escapeHtml(titleCase(block.yard)) + '</div>' + rows + '</div>';
+    }).join('');
+
+    body.querySelectorAll('[data-remove-idx]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        const idx = parseInt(btn.getAttribute('data-remove-idx'), 10);
+        currentOrder.items.splice(idx, 1);
+        updateOrderStatus();
+        renderOrderPanel();
+      });
+    });
+  }
+
+  document.getElementById('orderPanelCollapse').addEventListener('click', function(){
+    const panel = document.getElementById('orderPanel');
+    panel.classList.add('collapsed');
+    renderOrderPanel();
+  });
+  document.getElementById('orderTab').addEventListener('click', function(){
+    document.getElementById('orderPanel').classList.remove('collapsed');
+    renderOrderPanel();
+  });
+
+  function pushOrderItem(p, qty){
+    currentOrder.items.push(Object.assign({}, p, { qty: qty }));
+    updateOrderStatus();
+    renderOrderPanel();
+  }
+
+  function addToOrder(p){
+    if(!p || !currentOrder) return;
+    showPrompt(
+      'Add to order',
+      'How many units of "' + (p.botanical_name || 'this plant') + '" (' + (p.size || 'single size') + ') would you like to add to ' + currentOrder.clientName + '\'s order?',
+      '1',
+      function(qtyStr){
+        const qty = parseInt(qtyStr, 10);
+        if(!qty || qty <= 0){ showAlert('Invalid quantity.'); return; }
+        pushOrderItem(p, qty);
+        closeModal();
+      }
+    );
+  }
+
+  // quick add from the size chip, without opening the plant details
+  function quickAddToOrder(p){
+    if(!p) return;
+    if(!currentOrder){
+      showAlert('Create an order first with the "Create order" button before adding plants.');
+      return;
+    }
+    showPrompt(
+      'Add to order',
+      'How many units of "' + (p.botanical_name || 'this plant') + '" (' + (p.size || 'single size') + ') would you like to add to ' + currentOrder.clientName + '\'s order?',
+      '1',
+      function(qtyStr){
+        const qty = parseInt(qtyStr, 10);
+        if(!qty || qty <= 0){ showAlert('Invalid quantity.'); return; }
+        pushOrderItem(p, qty);
+      }
+    );
+  }
+
+  document.getElementById('createOrderBtn').addEventListener('click', createOrder);
+  document.getElementById('closeOrderBtn').addEventListener('click', closeOrder);
+  document.getElementById('exportOrderBtn').addEventListener('click', function(){ exportOrderFlow(); });
+
+  // navigate to an external site using a real link (more reliable than window.open
+  // inside the artifact sandbox)
+  function openExternal(url){
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  // ---- name context menu: Search on Google / Copy ----
+  function openNameMenu(x, y, name){
+    const menu = document.getElementById('nameMenu');
+    menu.innerHTML =
+      '<div class="nm-header">' + escapeHtml(name) + '</div>' +
+      '<button type="button" id="nmGoogle">🔍 Search on Google</button>' +
+      '<button type="button" id="nmCopy">📋 Copy</button>';
+    menu.style.display = 'block';
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(x, vw - rect.width - 8)) + 'px';
+    menu.style.top = Math.max(4, Math.min(y, vh - rect.height - 8)) + 'px';
+    document.getElementById('nmGoogle').addEventListener('click', function(){
+      openExternal('https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(name));
+      closeNameMenu();
+    });
+    document.getElementById('nmCopy').addEventListener('click', function(){
+      copyToClipboard(name);
+      closeNameMenu();
+    });
+  }
+  function closeNameMenu(){
+    document.getElementById('nameMenu').style.display = 'none';
+  }
+  function copyToClipboard(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).catch(function(){ fallbackCopy(text); });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  function fallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+  document.addEventListener('click', function(e){
+    const nameEl = e.target.closest('.name-trigger');
+    if(nameEl){
+      e.preventDefault();
+      e.stopPropagation();
+      const name = nameEl.getAttribute('data-plant-name') || nameEl.textContent.trim();
+      openNameMenu(e.clientX, e.clientY, name);
+      return;
+    }
+    const menu = document.getElementById('nameMenu');
+    if(menu.style.display !== 'none' && !menu.contains(e.target)) closeNameMenu();
+  });
+
+  // ---- search the content of the search box on Google Images ----
+  document.getElementById('googleSearchBtn').addEventListener('click', function(){
+    const q = document.getElementById('searchInput').value.trim();
+    if(!q){ showAlert('Type something in the search box first.'); return; }
+    openExternal('https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(q));
+  });
+  document.getElementById('classicTable').addEventListener('click', function(e){
+    const quickBtn = e.target.closest('.quick-add-btn');
+    if(quickBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      const idx = parseInt(quickBtn.getAttribute('data-idx'), 10);
+      const p = variantRegistry[idx];
+      if(p) quickAddToOrder(p);
+      return;
+    }
+    const cell = e.target.closest('.size-chip');
+    if(!cell) return;
+    const idx = parseInt(cell.getAttribute('data-idx'), 10);
+    const p = variantRegistry[idx];
+    if(p) openModal(p);
+  });
+
+  function render(){
+    buildChips();
+    syncControls();
+
+    // don't show the full listing by default: only once the user
+    // explicitly asks for something (a yard, a search, or some filter)
+    const somethingRequested = !!(state.yard || state.query.trim() || state.category || state.form || state.region || state.comment || state.sizeQuery.trim());
+
+    const grid = document.getElementById('grid');
+    const classicWrap = document.getElementById('classicWrap');
+    const empty = document.getElementById('emptyState');
+    const orderRowLeft = document.getElementById('orderRowLeft');
+    const resultSummary = document.getElementById('resultSummary');
+
+    orderRowLeft.style.display = state.classic ? 'flex' : 'none';
+    renderOrderPanel();
+
+    if(!somethingRequested){
+      resultSummary.style.display = 'none';
+      grid.innerHTML = '';
+      classicWrap.style.display = 'none';
+      empty.style.display = 'none';
+      return;
+    }
+    resultSummary.style.display = 'flex';
+
+    const filtered = plants.filter(matches).sort(sortFn);
+    const groups = groupForDisplay(filtered);
+
+    document.getElementById('resultCount').textContent = filtered.length.toLocaleString('en-US');
+    document.getElementById('varietyCount').textContent = groups.length !== filtered.length
+      ? '(' + groups.length.toLocaleString('en-US') + ' varieties)' : '';
+
+    if(filtered.length === 0){
+      grid.innerHTML = '';
+      classicWrap.style.display = 'none';
+      empty.style.display = 'block';
+      empty.innerHTML = '<h2>No plants found</h2><div>Try a different search term or remove some filters.</div>';
+      return;
+    }
+    empty.style.display = 'none';
+
+    if(state.classic){
+      grid.style.display = 'none';
+      classicWrap.style.display = 'block';
+      document.getElementById('classicTable').innerHTML = classicTableHtml(groups);
+    } else {
+      classicWrap.style.display = 'none';
+      grid.style.display = 'grid';
+      const MAX_GROUPS = 250;
+      const toRender = groups.slice(0, MAX_GROUPS);
+      grid.innerHTML = toRender.map(function(g){
+        return g.length > 1 ? groupCardHtml(g) : singleCardHtml(g[0]);
+      }).join('');
+      if(groups.length > MAX_GROUPS){
+        grid.insertAdjacentHTML('beforeend', '<div class="empty-state" style="grid-column:1/-1;padding:20px;">Showing the first ' + MAX_GROUPS + ' of ' + groups.length + ' varieties. Narrow your search to see more.</div>');
+      }
+    }
+  }
+
+  function populateFilters(){
+    buildYardSelect();
+    [['categorySelect','category'],['formSelect','form'],['regionSelect','region'],['commentSelect','comment']].forEach(function(pair){
+      document.getElementById(pair[0]).innerHTML = '<option value="">All</option>';
+      fillSelect(pair[0], uniqueSorted(pair[1]), pair[1] === 'comment' ? function(v){return v;} : undefined);
+    });
+    const dl = document.getElementById('sizeDatalist');
+    dl.innerHTML = '';
+    uniqueSorted('size').sort(function(a,b){ return sizeNum(a)-sizeNum(b); }).forEach(function(v){
+      const opt = document.createElement('option'); opt.value = v; dl.appendChild(opt);
+    });
+  }
+
+  document.getElementById('classicToggle').addEventListener('change', function(e){
+    state.classic = e.target.checked;
+    render();
+  });
+
+  const filterTab = document.getElementById('filterTab');
+  function setFiltersOpen(open){
+    document.querySelector('.control-panel').classList.toggle('filters-open', open);
+    filterTab.setAttribute('aria-expanded', String(open));
+  }
+  filterTab.addEventListener('click', function(){ setFiltersOpen(true); });
+  document.getElementById('closeFiltersBtn').addEventListener('click', function(){ setFiltersOpen(false); });
+  document.getElementById('filterBackdrop').addEventListener('click', function(){ setFiltersOpen(false); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') setFiltersOpen(false); });
+
+  document.getElementById('searchInput').addEventListener('input', function(e){
+    state.query = e.target.value;
+    e.target.classList.toggle('filter-active', !!state.query.trim());
+    render();
+  });
+  document.getElementById('sizeInput').addEventListener('input', function(e){
+    state.sizeQuery = e.target.value;
+    e.target.classList.toggle('filter-active', !!state.sizeQuery.trim());
+    render();
+  });
+  document.getElementById('newSearchBtn').addEventListener('click', function(){
+    state.query = "";
+    const input = document.getElementById('searchInput');
+    input.value = "";
+    input.classList.remove('filter-active');
+    render();
+  });
+  ['yard','category','form','region','comment'].forEach(function(key){
+    document.getElementById(key + 'Select').addEventListener('change', function(e){
+      state[key] = e.target.value;
+      render();
+      if(key !== 'yard' && matchMedia('(max-width: 640px)').matches) setFiltersOpen(false);
+    });
+  });
+  function resetAllFilters(){
+    state.query = ""; state.yard = ""; state.category = ""; state.form = ""; state.region = ""; state.comment = ""; state.sizeQuery = "";
+    document.getElementById('searchInput').value = "";
+    document.getElementById('sizeInput').value = "";
+    render();
+  }
+  document.getElementById('resetBtnTop').addEventListener('click', resetAllFilters);
+
+  document.getElementById('refreshBtn').addEventListener('click', function(){
+    showConfirm(
+      'Refresh data',
+      'This will reset all search filters and cancel any order in progress (if one is linked, it will be closed). Do you want to continue?',
+      function(){
+        resetAllFilters();
+        currentOrder = null;
+        updateOrderStatus();
+        updateOrderButtons();
+        renderOrderPanel();
+        closeModal();
+        closeNameMenu();
+        reloadInventory();
+      }
+    );
+  });
+
+  updateOrderButtons();
+  render();
+  reloadInventory();
+})();
+</script>
+</body>
+</html>
